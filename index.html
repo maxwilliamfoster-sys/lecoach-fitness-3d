@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Le Coach Fitness — 3D Walkthrough (v2 look &amp; lighting)</title>
+<title>Le Coach Fitness — 3D Walkthrough</title>
 <style>
   :root { --accent:#e8b04b; }
   * { margin:0; padding:0; box-sizing:border-box; }
@@ -14,17 +14,17 @@
     text-align:center; z-index:20; background:radial-gradient(circle at 50% 40%, #1a1c22 0%, #0b0c0f 70%); }
   #overlay h1 { font-size:2.4rem; letter-spacing:1px; margin-bottom:.3rem; }
   #overlay h1 span { color:var(--accent); }
-  #overlay p { color:#9aa0aa; max-width:520px; margin:.4rem auto; line-height:1.5; }
+  #overlay p { color:#9aa0aa; max-width:560px; margin:.4rem auto; line-height:1.5; }
   #start { margin-top:1.4rem; padding:.85rem 2.2rem; font-size:1.05rem; font-weight:600; cursor:pointer;
     background:var(--accent); color:#151515; border:none; border-radius:10px; transition:transform .1s, box-shadow .2s;
     box-shadow:0 6px 24px rgba(232,176,75,.35); }
-  #start:hover { transform:translateY(-2px); box-shadow:0 10px 30px rgba(232,176,75,.5); }
+  #start:disabled { opacity:.5; cursor:default; }
+  #start:not(:disabled):hover { transform:translateY(-2px); box-shadow:0 10px 30px rgba(232,176,75,.5); }
   .keys { margin-top:1.3rem; font-size:.85rem; color:#7d828c; }
   .keys b { color:#cfd3da; }
   #hud { position:fixed; left:16px; bottom:14px; z-index:10; font-size:.8rem; color:#c9cdd4;
          background:rgba(12,13,17,.6); padding:8px 12px; border-radius:8px; backdrop-filter:blur(6px);
          border:1px solid rgba(255,255,255,.07); pointer-events:none; }
-  #zone { color:var(--accent); font-weight:700; font-size:.95rem; }
   #crosshair { position:fixed; top:50%; left:50%; width:6px; height:6px; margin:-3px 0 0 -3px; z-index:10;
                border-radius:50%; background:rgba(255,255,255,.55); pointer-events:none; display:none; }
   #help { position:fixed; right:16px; bottom:14px; z-index:10; font-size:.72rem; color:#6b7079; text-align:right; pointer-events:none; }
@@ -33,13 +33,13 @@
 <body>
 <div id="app"></div>
 <div id="crosshair"></div>
-<div id="hud">You are in: <span id="zone">Entrance</span><br /><span id="coords" style="color:#6b7079"></span></div>
+<div id="hud"><span id="coords" style="color:#6b7079">loading…</span></div>
 <div id="help">WASD / arrows move · Mouse look · Shift sprint · Esc release</div>
 <div id="overlay">
   <h1>LE COACH <span>FITNESS</span></h1>
   <p>2 Winship Road, Milton, Cambridge · First-person 3D walkthrough</p>
-  <p style="font-size:.82rem; color:#6b7079;">v2 — PBR materials, image-based lighting, real mirror reflections &amp; bloom.</p>
-  <button id="start">▶ Enter the gym</button>
+  <p style="font-size:.82rem; color:#6b7079;">Accurate building model — duo-pitch hall, front-of-house &amp; storage block, built to scale from the gym's build-vlog footage.</p>
+  <button id="start" disabled>Loading model…</button>
   <div class="keys"><b>W A S D</b> or arrows to move · <b>Mouse</b> to look · <b>Shift</b> to sprint · <b>Esc</b> to release cursor</div>
 </div>
 
@@ -53,23 +53,19 @@
 <script type="module">
 import * as THREE from 'three';
 import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
-import { Reflector } from 'three/addons/objects/Reflector.js';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 
-// ---------- Building dimensions (metres) ----------
-const W = 32, D = 18, H = 4.5, WALL = 0.2;
-
+const EYE = 1.65;
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x0e0f13);
-scene.fog = new THREE.Fog(0x0e0f13, 24, 60);
 
-const camera = new THREE.PerspectiveCamera(72, innerWidth/innerHeight, 0.05, 200);
-const EYE = 1.65;
-camera.position.set(0, EYE, D/2 - 2);
+const camera = new THREE.PerspectiveCamera(72, innerWidth/innerHeight, 0.05, 300);
+camera.position.set(0, EYE, 0);
 
 const renderer = new THREE.WebGLRenderer({ antialias:true });
 renderer.setSize(innerWidth, innerHeight);
@@ -77,197 +73,107 @@ renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
-renderer.toneMapping = THREE.ACESFilmicToneMapping;   // filmic look
-renderer.toneMappingExposure = 1.05;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.1;
 document.getElementById('app').appendChild(renderer.domElement);
 
-// ---------- Image-based lighting (free, procedural room env) ----------
 const pmrem = new THREE.PMREMGenerator(renderer);
-scene.environment = pmrem.fromScene(new RoomEnvironment(renderer), 0.04).texture;
+scene.environment = pmrem.fromScene(new RoomEnvironment(renderer), 0.05).texture;
 
-// ---------- Real generated textures (SDXL, local ComfyUI) ----------
+// ---- generated textures (from local ComfyUI SDXL) ----
 const texLoader = new THREE.TextureLoader();
-function loadTex(file, rx, ry, srgb=true){
+function loadTex(file, rx, ry){
   const t = texLoader.load('textures/'+file);
-  t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(rx,ry); t.anisotropy = 8;
-  if(srgb) t.colorSpace = THREE.SRGBColorSpace;
-  return t;
+  t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(rx, ry);
+  t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; return t;
 }
-const TEX = {
-  floor: loadTex('floor_rubber.png', W/2, D/2),
-  wall:  loadTex('wall_concrete.png', 6, 1.4),
-  room:  loadTex('wall_concrete.png', 4, 1.2),
-  steel: loadTex('metal_steel.png', 1, 1),
-};
+const TEX_FLOOR = loadTex('floor_rubber.png', 16, 7);
+const TEX_WALL  = loadTex('wall_concrete.png', 12, 3);
 
-// ---------- Procedural PBR textures (hi-res, offline) ----------
-function makeCanvas(size, draw){ const c=document.createElement('canvas'); c.width=c.height=size; draw(c.getContext('2d'),size); return c; }
-
-function rubberFloor(){
-  const c = makeCanvas(512,(x,s)=>{
-    x.fillStyle='#191b20'; x.fillRect(0,0,s,s);
-    for(let i=0;i<9000;i++){ const g=18+Math.random()*40; x.fillStyle=`rgba(${g},${g},${g+5},${Math.random()*0.55})`; x.fillRect(Math.random()*s,Math.random()*s,2,2); }
-    // faint tile seams
-    x.strokeStyle='rgba(0,0,0,0.25)'; x.lineWidth=2;
-    for(let i=0;i<=s;i+=128){ x.beginPath(); x.moveTo(i,0); x.lineTo(i,s); x.moveTo(0,i); x.lineTo(s,i); x.stroke(); }
-  });
-  const t=new THREE.CanvasTexture(c); t.wrapS=t.wrapT=THREE.RepeatWrapping; t.repeat.set(W/2,D/2);
-  t.colorSpace=THREE.SRGBColorSpace; t.anisotropy=8; return t;
+// ---- lighting ----
+scene.add(new THREE.HemisphereLight(0xcdd6e2, 0x0d0f13, 0.5));
+scene.add(new THREE.AmbientLight(0xffffff, 0.18));
+for(let i=-2;i<=2;i++){
+  const l = new THREE.PointLight(0xfff1d4, 60, 26, 2);
+  l.position.set(i*7, 4.2, 0);
+  scene.add(l);
 }
-function roughMap(size, base){
-  const c=makeCanvas(size,(x,s)=>{ x.fillStyle=base; x.fillRect(0,0,s,s);
-    for(let i=0;i<6000;i++){ const v=Math.random()*80; x.fillStyle=`rgba(${v},${v},${v},0.4)`; x.fillRect(Math.random()*s,Math.random()*s,2,2);} });
-  const t=new THREE.CanvasTexture(c); t.wrapS=t.wrapT=THREE.RepeatWrapping; t.repeat.set(W/2,D/2); return t;
-}
-function concrete(hex){
-  const c=makeCanvas(256,(x,s)=>{ x.fillStyle=hex; x.fillRect(0,0,s,s);
-    for(let i=0;i<1400;i++){ const a=Math.random()*0.06; x.fillStyle=`rgba(0,0,0,${a})`; x.fillRect(Math.random()*s,Math.random()*s,3,3);}
-    for(let i=0;i<200;i++){ const a=Math.random()*0.05; x.fillStyle=`rgba(255,255,255,${a})`; x.fillRect(Math.random()*s,Math.random()*s,2,2);} });
-  const t=new THREE.CanvasTexture(c); t.wrapS=t.wrapT=THREE.RepeatWrapping; t.colorSpace=THREE.SRGBColorSpace; return t;
-}
+// a couple toward the front-of-house / ends
+[[10,3.4,4],[-10,3.4,-4]].forEach(([x,y,z])=>{
+  const l=new THREE.PointLight(0xffffff,40,22,2); l.position.set(x,y,z); scene.add(l);
+});
 
-// ---------- Floor & ceiling ----------
-const floor = new THREE.Mesh(new THREE.PlaneGeometry(W,D),
-  new THREE.MeshStandardMaterial({ map:TEX.floor, roughness:0.9, metalness:0.05, envMapIntensity:0.35 }));
-floor.rotation.x=-Math.PI/2; floor.receiveShadow=true; scene.add(floor);
-
-const ceil = new THREE.Mesh(new THREE.PlaneGeometry(W,D), new THREE.MeshStandardMaterial({ color:0x111318, roughness:1 }));
-ceil.rotation.x=Math.PI/2; ceil.position.y=H; scene.add(ceil);
-
-// ---------- Collision ----------
-const colliders=[];
-function pushCollider(obj){ obj.updateMatrixWorld(); const b=new THREE.Box3().setFromObject(obj);
-  colliders.push({minX:b.min.x,maxX:b.max.x,minZ:b.min.z,maxZ:b.max.z}); }
-
-const wallMat=new THREE.MeshStandardMaterial({ map:TEX.wall, roughness:0.92, metalness:0.02, envMapIntensity:0.4 });
-const roomMat=new THREE.MeshStandardMaterial({ map:TEX.room, roughness:0.85, envMapIntensity:0.4 });
-
-function wall(w,h,d,x,y,z,mat=wallMat,collide=true){
-  const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat); m.position.set(x,y,z);
-  m.castShadow=true; m.receiveShadow=true; scene.add(m); if(collide) pushCollider(m); return m; }
-
-// perimeter
-wall(W,H,WALL,0,H/2,-D/2); wall(W,H,WALL,0,H/2,D/2);
-wall(WALL,H,D,-W/2,H/2,0); wall(WALL,H,D,W/2,H/2,0);
-// leg room (back-left)
-wall(7,H,WALL,-W/2+3.5,H/2,-D/2+5,roomMat); wall(WALL,H,5,-W/2+7,H/2,-D/2+2.5,roomMat);
-// posing room (back-right)
-wall(6,H,WALL,W/2-3,H/2,-D/2+5,roomMat); wall(WALL,H,5,W/2-6,H/2,-D/2+2.5,roomMat);
-// showers/WC (front-left)
-wall(6,H,WALL,-W/2+3,H/2,D/2-5,roomMat); wall(WALL,H,5,-W/2+6,H/2,D/2-2.5,roomMat);
-// reception desk
-wall(3,1.1,0.8,6,0.55,D/2-3,new THREE.MeshStandardMaterial({color:0x3a2f22,roughness:0.55,metalness:0.1}));
-
-// ---------- Real mirror in posing room (planar reflection) ----------
-const mirror = new Reflector(new THREE.PlaneGeometry(5.6,2.6), {
-  color:0x8a8f96, textureWidth:1024, textureHeight:1024, clipBias:0.003 });
-mirror.position.set(W/2-3,1.4,-D/2+0.25); scene.add(mirror);
-// thin frame
-wall(5.8,2.8,0.06,W/2-3,1.4,-D/2+0.18,new THREE.MeshStandardMaterial({color:0x0c0d10,roughness:0.5}),false);
-
-// ---------- Materials ----------
-const chrome = new THREE.MeshPhysicalMaterial({ color:0x9aa0a8, roughness:0.28, metalness:1.0, envMapIntensity:1.2, clearcoat:0.4 });
-const steel  = new THREE.MeshStandardMaterial({ map:TEX.steel, color:0x6a7078, roughness:0.5, metalness:0.85, envMapIntensity:0.9 });
-const pad    = new THREE.MeshStandardMaterial({ color:0x1a2230, roughness:0.65, envMapIntensity:0.3 });
-const rubberM= new THREE.MeshStandardMaterial({ color:0x0f1116, roughness:0.95, envMapIntensity:0.15 });
-const gold   = new THREE.MeshStandardMaterial({ color:0xe8b04b, roughness:0.35, metalness:0.6, envMapIntensity:1.0 });
-
-const equip=new THREE.Group(); scene.add(equip);
-function box(w,h,d,x,y,z,mat,parent=equip){ const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat);
-  m.position.set(x,y,z); m.castShadow=true; m.receiveShadow=true; parent.add(m); return m; }
-function group(x,z,rot=0){ const g=new THREE.Group(); g.position.set(x,0,z); g.rotation.y=rot; equip.add(g); return g; }
-function finalize(g){ g.updateMatrixWorld(); const b=new THREE.Box3().setFromObject(g);
-  colliders.push({minX:b.min.x,maxX:b.max.x,minZ:b.min.z,maxZ:b.max.z}); }
-
-function machine(x,z,rot=0,accent=false){ const g=group(x,z,rot);
-  box(1.1,0.25,1.4,0,0.12,0,rubberM,g);
-  box(0.13,2.0,0.13,-0.4,1.0,-0.5,chrome,g); box(0.13,2.0,0.13,0.4,1.0,-0.5,chrome,g);
-  box(1.0,0.12,0.5,0,1.9,-0.5,steel,g);
-  box(0.9,0.5,0.45,0,0.6,0.3, accent?gold:pad,g);
-  box(0.9,0.7,0.12,0,1.15,0.55,pad,g);
-  box(0.5,0.9,0.35,0,0.9,-0.55,steel,g);
-  finalize(g); return g; }
-function bench(x,z,rot=0){ const g=group(x,z,rot);
-  box(0.4,0.45,1.3,0,0.22,0,steel,g); box(0.42,0.12,1.3,0,0.5,0,pad,g);
-  box(0.06,1.2,0.06,-0.65,0.9,-0.45,chrome,g); box(0.06,1.2,0.06,0.65,0.9,-0.45,chrome,g);
-  box(2.0,0.06,0.06,0,1.35,-0.45,chrome,g); finalize(g); }
-function dbRack(x,z,rot=0){ const g=group(x,z,rot);
-  box(4,0.9,0.6,0,0.45,0,steel,g);
-  for(let i=0;i<8;i++) box(0.3,0.3,0.3,-1.7+i*0.48,0.78,0,rubberM,g); finalize(g); }
-function rack(x,z){ const g=group(x,z);
-  [[-0.7,-0.7],[0.7,-0.7],[-0.7,0.7],[0.7,0.7]].forEach(([px,pz])=>box(0.12,2.4,0.12,px,1.2,pz,steel,g));
-  box(1.5,0.12,0.12,0,2.35,-0.7,steel,g); box(2.0,0.07,0.07,0,1.6,0.2,chrome,g); finalize(g); }
-function cardio(x,z,rot=0){ const g=group(x,z,rot);
-  box(0.9,0.2,1.8,0,0.15,0,rubberM,g); box(0.9,1.2,0.15,0,0.8,-0.8,steel,g);
-  box(0.7,0.5,0.08,0,1.3,-0.85,new THREE.MeshStandardMaterial({color:0x0a0c10,roughness:0.3,metalness:0.2}),g); finalize(g); }
-
-// populate
-for(let i=0;i<5;i++) machine(-W/2+2.2,-3+i*3,Math.PI/2,i===0);
-for(let i=0;i<5;i++) machine(W/2-2.2,-3+i*3,-Math.PI/2);
-machine(-W/2+2,-D/2+2.5,0,true); machine(-W/2+5,-D/2+2.5,0);
-bench(-3,2); bench(-1,2); bench(1,2);
-dbRack(-4,4.5,Math.PI/2); rack(4,3); rack(6.5,3);
-for(let i=0;i<4;i++) machine(-6+i*3,-2,0);
-for(let i=0;i<4;i++) cardio(9,-1+i*2.2);
-
-// ---------- Zone labels ----------
-function labelSprite(text,x,z){
-  const c=makeCanvas(512,(g,s)=>{ g.clearRect(0,0,s,128); g.fillStyle='rgba(10,11,15,0.72)'; g.fillRect(0,0,s,128);
-    g.font='bold 54px Segoe UI, sans-serif'; g.fillStyle='#e8b04b'; g.textAlign='center'; g.textBaseline='middle'; g.fillText(text,s/2,64); });
-  const t=new THREE.CanvasTexture(c); t.colorSpace=THREE.SRGBColorSpace;
-  const sp=new THREE.Sprite(new THREE.SpriteMaterial({map:t,transparent:true,depthWrite:false}));
-  sp.position.set(x,3.4,z); sp.scale.set(3.4,0.85,1); scene.add(sp); }
-const ZONES=[
-  {name:'Entrance / Reception',x:4,z:D/2-4},{name:'Free Weights',x:0,z:2.5},
-  {name:'Nautilus Machines',x:-W/2+3,z:0},{name:'Cybex Machines',x:W/2-3,z:0},
-  {name:'Keiser / Functional',x:-1.5,z:-2},{name:'Cardio',x:9,z:0},
-  {name:'Leg Room',x:-W/2+4,z:-D/2+3},{name:'Posing Room',x:W/2-4,z:-D/2+3},
-  {name:'Showers / WC',x:-W/2+3,z:D/2-3}];
-ZONES.forEach(z=>labelSprite(z.name,z.x,z.z));
-
-// ---------- Lighting ----------
-scene.add(new THREE.HemisphereLight(0xcdd6e2,0x0d0f13,0.4));
-scene.add(new THREE.AmbientLight(0xffffff,0.12));
-const fixtures=[];
-function bay(x,z){
-  const l=new THREE.PointLight(0xfff1d4,0.85,22,2); l.position.set(x,H-0.3,z);
-  l.castShadow=true; l.shadow.mapSize.set(1024,1024); l.shadow.bias=-0.0006; scene.add(l);
-  const bulb=new THREE.Mesh(new THREE.BoxGeometry(1.3,0.14,0.42),
-    new THREE.MeshStandardMaterial({emissive:0xfff1d4,emissiveIntensity:2.2,color:0x111111}));
-  bulb.position.set(x,H-0.14,z); scene.add(bulb); fixtures.push(bulb); }
-for(let ix=-1;ix<=1;ix++) for(let iz=-1;iz<=1;iz++) bay(ix*10,iz*6);
-const pose=new THREE.PointLight(0xffffff,1.4,12,2); pose.position.set(W/2-4,3,-D/2+3); scene.add(pose);
-// gold accent strip glow at entrance
-const strip=new THREE.Mesh(new THREE.BoxGeometry(6,0.08,0.08),
-  new THREE.MeshStandardMaterial({emissive:0xe8b04b,emissiveIntensity:3,color:0x111111}));
-strip.position.set(6,2.2,D/2-3.4); scene.add(strip); fixtures.push(strip);
-
-// ---------- Post-processing (bloom) ----------
-const composer=new EffectComposer(renderer);
-composer.addPass(new RenderPass(scene,camera));
-const bloom=new UnrealBloomPass(new THREE.Vector2(innerWidth,innerHeight),0.42,0.5,0.9);
-composer.addPass(bloom);
-composer.addPass(new OutputPass());
-
-// ---------- Controls ----------
-const controls=new PointerLockControls(camera,renderer.domElement);
-const overlay=document.getElementById('overlay'), crosshair=document.getElementById('crosshair');
-document.getElementById('start').addEventListener('click',()=>controls.lock());
-controls.addEventListener('lock',()=>{overlay.style.display='none'; crosshair.style.display='block';});
-controls.addEventListener('unlock',()=>{overlay.style.display='flex'; crosshair.style.display='none';});
-const keys={}; addEventListener('keydown',e=>keys[e.code]=true); addEventListener('keyup',e=>keys[e.code]=false);
-
-const RADIUS=0.35;
+// ---- collision ----
+const colliders = [];   // {minX,maxX,minZ,maxZ}
+let BOUND = { minX:-15.8, maxX:15.8, minZ:-6.3, maxZ:6.3 };
+const RADIUS = 0.35;
 function resolveCollisions(p){
   for(const c of colliders){
     const cx=Math.max(c.minX,Math.min(p.x,c.maxX)), cz=Math.max(c.minZ,Math.min(p.z,c.maxZ));
     const dx=p.x-cx, dz=p.z-cz, d2=dx*dx+dz*dz;
-    if(d2<RADIUS*RADIUS){ const d=Math.sqrt(d2)||1e-4, push=RADIUS-d; p.x+=(dx/d)*push; p.z+=(dz/d)*push; } }
-  p.x=Math.max(-W/2+RADIUS+WALL,Math.min(W/2-RADIUS-WALL,p.x));
-  p.z=Math.max(-D/2+RADIUS+WALL,Math.min(D/2-RADIUS-WALL,p.z)); }
+    if(d2 < RADIUS*RADIUS){ const d=Math.sqrt(d2)||1e-4, push=RADIUS-d; p.x+=(dx/d)*push; p.z+=(dz/d)*push; }
+  }
+  p.x=Math.max(BOUND.minX+RADIUS,Math.min(BOUND.maxX-RADIUS,p.x));
+  p.z=Math.max(BOUND.minZ+RADIUS,Math.min(BOUND.maxZ-RADIUS,p.z));
+}
 
-const zoneEl=document.getElementById('zone'), coordsEl=document.getElementById('coords');
-function nearestZone(p){ let best=ZONES[0],bd=1e9; for(const z of ZONES){const d=(z.x-p.x)**2+(z.z-p.z)**2; if(d<bd){bd=d;best=z;}} return best.name; }
+// ---- load building ----
+const startBtn = document.getElementById('start');
+const coordsEl = document.getElementById('coords');
+new GLTFLoader().load('lecoach_gym.glb', (gltf)=>{
+  const model = gltf.scene;
+  const box = new THREE.Box3();
+  model.traverse(o=>{
+    if(!o.isMesh) return;
+    o.castShadow = true; o.receiveShadow = true;
+    const m = o.material;
+    if(m){ m.side = THREE.DoubleSide; m.envMapIntensity = 0.5; }
+    const nm = o.name;
+    // apply textures by name
+    if(/^Floor/i.test(nm)){
+      o.material = new THREE.MeshStandardMaterial({ map:TEX_FLOOR, roughness:0.9, metalness:0.04, side:THREE.DoubleSide, envMapIntensity:0.3 });
+    } else if(/^(Wall_|Gable)/i.test(nm)){
+      o.material = new THREE.MeshStandardMaterial({ map:TEX_WALL, roughness:0.92, metalness:0.02, side:THREE.DoubleSide, envMapIntensity:0.35 });
+    }
+    // build collider only for things at body height (skip floor, roof, beams, ceilings)
+    box.setFromObject(o);
+    if(!/^Floor/i.test(nm) && box.min.y < 1.7 && box.max.y > 0.1){
+      colliders.push({ minX:box.min.x, maxX:box.max.x, minZ:box.min.z, maxZ:box.max.z });
+    }
+  });
+  scene.add(model);
+
+  // fit player bounds to model
+  const full = new THREE.Box3().setFromObject(model);
+  BOUND = { minX:full.min.x+0.3, maxX:full.max.x-0.3, minZ:full.min.z+0.3, maxZ:full.max.z-0.3 };
+  // spawn in open hall centre
+  controls.getObject().position.set(0, EYE, 0);
+
+  startBtn.disabled = false;
+  startBtn.textContent = '▶ Enter the gym';
+  coordsEl.textContent = `${colliders.length} colliders · ready`;
+}, (xhr)=>{
+  if(xhr.total) startBtn.textContent = `Loading ${Math.round(xhr.loaded/xhr.total*100)}%`;
+}, (err)=>{
+  startBtn.textContent = 'Model failed to load';
+  coordsEl.textContent = 'error loading lecoach_gym.glb';
+  console.error(err);
+});
+
+// ---- post-processing ----
+const composer = new EffectComposer(renderer);
+composer.addPass(new RenderPass(scene, camera));
+composer.addPass(new UnrealBloomPass(new THREE.Vector2(innerWidth,innerHeight), 0.38, 0.5, 0.9));
+composer.addPass(new OutputPass());
+
+// ---- controls ----
+const controls = new PointerLockControls(camera, renderer.domElement);
+const overlay = document.getElementById('overlay');
+const crosshair = document.getElementById('crosshair');
+startBtn.addEventListener('click', ()=>{ if(!startBtn.disabled) controls.lock(); });
+controls.addEventListener('lock', ()=>{ overlay.style.display='none'; crosshair.style.display='block'; });
+controls.addEventListener('unlock', ()=>{ overlay.style.display='flex'; crosshair.style.display='none'; });
+const keys={}; addEventListener('keydown',e=>keys[e.code]=true); addEventListener('keyup',e=>keys[e.code]=false);
 
 const clock=new THREE.Clock(); const dir=new THREE.Vector3(); let hudT=0;
 function animate(){
@@ -277,17 +183,24 @@ function animate(){
     const speed=((keys['ShiftLeft']||keys['ShiftRight'])?7.5:3.6)*dt;
     const f=(keys['KeyW']||keys['ArrowUp']?1:0)-(keys['KeyS']||keys['ArrowDown']?1:0);
     const s=(keys['KeyD']||keys['ArrowRight']?1:0)-(keys['KeyA']||keys['ArrowLeft']?1:0);
-    if(f||s){ dir.set(s,0,-f).normalize(); const p=controls.getObject().position;
+    if(f||s){
+      dir.set(s,0,-f).normalize();
+      const p=controls.getObject().position;
       const yaw=controls.getObject().rotation.y, sin=Math.sin(yaw), cos=Math.cos(yaw);
-      p.x+=(dir.x*cos-dir.z*sin)*speed; p.z+=(dir.x*sin+dir.z*cos)*speed; p.y=EYE; resolveCollisions(p); }
-    hudT+=dt; if(hudT>0.15){ hudT=0; const p=controls.getObject().position;
-      zoneEl.textContent=nearestZone(p); coordsEl.textContent=`x ${p.x.toFixed(1)}  z ${p.z.toFixed(1)}`; } }
+      p.x+=(dir.x*cos-dir.z*sin)*speed; p.z+=(dir.x*sin+dir.z*cos)*speed; p.y=EYE;
+      resolveCollisions(p);
+    }
+    hudT+=dt; if(hudT>0.2){ hudT=0; const p=controls.getObject().position;
+      coordsEl.textContent=`x ${p.x.toFixed(1)}  z ${p.z.toFixed(1)}`; }
+  }
   composer.render();
 }
 animate();
 
-addEventListener('resize',()=>{ camera.aspect=innerWidth/innerHeight; camera.updateProjectionMatrix();
-  renderer.setSize(innerWidth,innerHeight); composer.setSize(innerWidth,innerHeight); });
+addEventListener('resize',()=>{
+  camera.aspect=innerWidth/innerHeight; camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth,innerHeight); composer.setSize(innerWidth,innerHeight);
+});
 </script>
 </body>
 </html>
