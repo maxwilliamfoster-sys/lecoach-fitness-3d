@@ -1,0 +1,15 @@
+# Copyrighted source footage — never publish (Le Coach Fitness YouTube videos)
+video/
+frames/
+
+# Blender backups
+*.blend1
+*.blend2
+
+# Python
+__pycache__/
+*.pyc
+
+# OS
+Thumbs.db
+.DS_Store
