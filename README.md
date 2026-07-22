@@ -2,7 +2,7 @@
 
 A free, browser-based first-person 3D walkthrough of **Le Coach Fitness**, an independent gym at 2 Winship Road, Milton, Cambridge (CB24 6BQ).
 
-**▶ Live demo:** _(GitHub Pages link appears here after deploy)_
+**▶ Live demo:** https://maxwilliamfoster-sys.github.io/lecoach-fitness-3d/
 
 ## Controls
 - **W A S D** / arrow keys — move
