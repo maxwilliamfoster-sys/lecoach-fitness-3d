@@ -93,15 +93,11 @@ const TEX_WALL  = loadTex('wall_concrete.png', 12, 3);
 // ---- lighting ----
 scene.add(new THREE.HemisphereLight(0xcdd6e2, 0x0d0f13, 0.5));
 scene.add(new THREE.AmbientLight(0xffffff, 0.18));
-for(let i=-2;i<=2;i++){
-  const l = new THREE.PointLight(0xfff1d4, 60, 26, 2);
-  l.position.set(i*7, 4.2, 0);
-  scene.add(l);
+// grid of ceiling lights so every room is lit
+for(const x of [-13,-6.5,0,6.5,13]) for(const z of [-3.5,3.5]){
+  const l=new THREE.PointLight(0xfff2d8, 42, 20, 2); l.position.set(x,3.6,z); scene.add(l);
 }
-// a couple toward the front-of-house / ends
-[[10,3.4,4],[-10,3.4,-4]].forEach(([x,y,z])=>{
-  const l=new THREE.PointLight(0xffffff,40,22,2); l.position.set(x,y,z); scene.add(l);
-});
+{ const l=new THREE.PointLight(0xffffff,35,22,2); l.position.set(0,4.6,0); scene.add(l); }
 
 // ---- collision ----
 const colliders = [];   // {minX,maxX,minZ,maxZ}
@@ -129,11 +125,9 @@ new GLTFLoader().load('lecoach_gym.glb', (gltf)=>{
     const m = o.material;
     if(m){ m.side = THREE.DoubleSide; m.envMapIntensity = 0.5; }
     const nm = o.name;
-    // apply textures by name
-    if(/^Floor/i.test(nm)){
+    // rubber texture on the main gym floors only; keep the dark Le Coach wall/accent materials
+    if(/^(Floor|FuncFloor)/i.test(nm)){
       o.material = new THREE.MeshStandardMaterial({ map:TEX_FLOOR, roughness:0.9, metalness:0.04, side:THREE.DoubleSide, envMapIntensity:0.3 });
-    } else if(/^(Wall_|Gable)/i.test(nm)){
-      o.material = new THREE.MeshStandardMaterial({ map:TEX_WALL, roughness:0.92, metalness:0.02, side:THREE.DoubleSide, envMapIntensity:0.35 });
     }
     // build collider only for things at body height (skip floor, roof, beams, ceilings)
     box.setFromObject(o);
