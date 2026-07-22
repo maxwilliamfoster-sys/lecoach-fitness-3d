@@ -184,10 +184,10 @@ function animate(){
     const f=(keys['KeyW']||keys['ArrowUp']?1:0)-(keys['KeyS']||keys['ArrowDown']?1:0);
     const s=(keys['KeyD']||keys['ArrowRight']?1:0)-(keys['KeyA']||keys['ArrowLeft']?1:0);
     if(f||s){
-      dir.set(s,0,-f).normalize();
       const p=controls.getObject().position;
-      const yaw=controls.getObject().rotation.y, sin=Math.sin(yaw), cos=Math.cos(yaw);
-      p.x+=(dir.x*cos-dir.z*sin)*speed; p.z+=(dir.x*sin+dir.z*cos)*speed; p.y=EYE;
+      controls.moveRight(s*speed);      // A/D
+      controls.moveForward(f*speed);    // W = forward, S = back
+      p.y=EYE;
       resolveCollisions(p);
     }
     hudT+=dt; if(hudT>0.2){ hudT=0; const p=controls.getObject().position;
