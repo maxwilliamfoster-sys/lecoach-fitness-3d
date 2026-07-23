@@ -79,11 +79,13 @@ wallX('Wall_LegS', X0, -10, 0.0, m_wall, gaps=[(-14.0,1.6)])   # south wall, doo
 wallY('Wall_LegE', 0.0, Y1, -10, m_wall)                       # east wall (solid)
 # FUNCTIONAL ROOM  right, full depth  x[10,20]  y[front,back]
 wallY('Wall_FuncW', Y0, Y1, 10, m_wall, gaps=[(-4.0,1.6),(5.0,1.6)])  # west wall, two doors
-# MAIN ROOM = all remaining open floor (front span + back-centre); no walls needed.
+# solid wall across the back-centre (former "delete this space") — NO doorway
+wallX('Wall_MidBack', -10, 10, 0.0, m_wall)
+# MAIN ROOM = the open FRONT span; back-centre is sealed off behind this wall.
 
 # ---- labels for plan verification ----
 label('LEG ROOM',-15,6,1.0); label('MAIN ROOM',0,-5,1.2)
-label('FUNCTIONAL ROOM',15,0,0.95); label('(open)',0,6,0.7)
+label('FUNCTIONAL ROOM',15,0,0.95); label('(sealed)',0,6,0.7)
 
 # ---- top-down plan render ----
 hide=[o.name for o in col.objects if o.name.startswith(('Roof_','Ridge_','Tie_'))]
