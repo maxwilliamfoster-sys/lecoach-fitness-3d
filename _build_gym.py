@@ -85,9 +85,18 @@ wallY('Wall_FuncW', Y0, Y1, 10, m_wall, gaps=[(-4.0,1.6),(5.0,1.6)])  # west wal
 wallX('Wall_MidBack', -10, 10, 0.0, m_wall)
 # MAIN ROOM = the open FRONT span; back-centre is sealed off behind this wall.
 
+# FRONT-OF-HOUSE extension along the front: RECEPTION (middle, at door) + TOILETS/LOCKERS (left)
+FS = -7.0                                                       # back edge of the front strip
+wallX('Wall_TLback',   X0,  -3.5, FS, m_wall)                   # toilets/lockers back (solid)
+wallX('Wall_Recepback',-3.5, 3.5, FS, m_wall, gaps=[(0,1.6)])  # reception back -> door into main room
+wallY('Wall_TLrecep',  Y0, FS, -3.5, m_wall, gaps=[(-9.5,1.2)])# toilets/lockers <-> reception door
+wallY('Wall_RecepR',   Y0, FS,  3.5, m_wall)                   # reception right side (solid)
+# (right of reception, x[3.5,10], stays open to the main room)
+
 # ---- labels for plan verification ----
-label('LEG ROOM',-15,6,1.0); label('MAIN ROOM',0,-5,1.2)
+label('LEG ROOM',-15,6,1.0); label('MAIN ROOM',3,-4,1.1)
 label('FUNCTIONAL ROOM',15,0,0.95); label('(sealed)',0,6,0.7)
+label('RECEPTION',0,-9.3,0.55); label('TOILETS & LOCKERS',-11.7,-9.3,0.6)
 
 # ---- top-down plan render ----
 hide=[o.name for o in col.objects if o.name.startswith(('Roof_','Ridge_','Tie_'))]
