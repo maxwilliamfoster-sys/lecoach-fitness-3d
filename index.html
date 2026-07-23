@@ -35,8 +35,9 @@
   #designBtn:hover { background:rgba(232,176,75,.15); }
   #design { position:fixed; inset:0; z-index:30; display:none; background:#0d0f13; }
   #design.on { display:flex; }
-  #plan { flex:1; height:100%; cursor:crosshair; background:#12141a; touch-action:none; }
-  #dpanel { width:310px; height:100%; overflow:auto; background:#15171d; border-left:1px solid #262a33; padding:16px; color:#cfd3da; }
+  #plan { flex:1 1 auto; min-width:0; height:100%; cursor:crosshair; background:#12141a; touch-action:none; }
+  #dpanel { flex:0 0 300px; width:300px; height:100%; overflow-y:auto; background:#15171d; border-left:1px solid #262a33; padding:16px; color:#cfd3da; }
+  @media (max-width:640px){ #dpanel{ flex-basis:210px; width:210px; padding:10px; } }
   #dpanel h3 { color:var(--accent); margin-bottom:8px; font-size:1rem; }
   #dpanel .hint { font-size:.78rem; color:#8a909b; line-height:1.55; margin-bottom:12px; }
   #rlist { font-size:.8rem; margin-bottom:12px; }
