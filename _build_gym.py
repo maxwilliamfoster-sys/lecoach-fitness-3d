@@ -1,5 +1,7 @@
 import bpy, bmesh
-from mathutils import Vector
+from mathutils import Vector, Matrix
+
+SCALE = 1.5   # enlarge the whole building & everything uniformly (about origin)
 
 # ---------------- reset ----------------
 bpy.ops.wm.read_factory_settings(use_empty=True)
@@ -104,6 +106,11 @@ for n in hide:
     o=col.objects.get(n); o.hide_render=False
 for o in list(col.objects):
     if o.name.startswith('LBL_'): bpy.data.objects.remove(o,do_unlink=True)
+# enlarge everything uniformly about the world origin
+S = Matrix.Scale(SCALE, 4)
+for o in bpy.data.objects:
+    if o.type=='MESH': o.matrix_world = S @ o.matrix_world
+bpy.context.view_layer.update()
 for o in bpy.data.objects: o.select_set(o.type=='MESH')
 bpy.ops.export_scene.gltf(filepath=r"C:\Users\maxwi\Desktop\LeCoach3D\lecoach_gym.glb",
                           export_format='GLB',use_selection=True,export_apply=True,export_yup=True)
