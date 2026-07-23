@@ -115,15 +115,16 @@ document.getElementById('app').appendChild(renderer.domElement);
 const pmrem = new THREE.PMREMGenerator(renderer);
 scene.environment = pmrem.fromScene(new RoomEnvironment(renderer), 0.05).texture;
 
-// ---- generated textures (from local ComfyUI SDXL) ----
+// ---- generated textures (local ComfyUI + FLUX.1 schnell) ----
 const texLoader = new THREE.TextureLoader();
 function loadTex(file, rx, ry){
   const t = texLoader.load('textures/'+file);
   t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(rx, ry);
   t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; return t;
 }
-const TEX_FLOOR = loadTex('floor_rubber.png', 16, 7);
-const TEX_WALL  = loadTex('wall_concrete.png', 12, 3);
+const TEX_FLOOR = loadTex('floor_rubber.png', 20, 12);
+const TEX_WALL  = loadTex('wall_dark.png', 8, 2);
+const TEX_ROOF  = loadTex('roof_steel.png', 10, 8);
 
 // ---- lighting ----
 scene.add(new THREE.HemisphereLight(0xcdd6e2, 0x0d0f13, 0.5));
@@ -160,9 +161,13 @@ new GLTFLoader().load('lecoach_gym.glb', (gltf)=>{
     const m = o.material;
     if(m){ m.side = THREE.DoubleSide; m.envMapIntensity = 0.5; }
     const nm = o.name;
-    // rubber texture on the main gym floors only; keep the dark Le Coach wall/accent materials
+    // FLUX textures: floor rubber, walls black brick, roof steel cladding
     if(/^(Floor|FuncFloor)/i.test(nm)){
       o.material = new THREE.MeshStandardMaterial({ map:TEX_FLOOR, roughness:0.9, metalness:0.04, side:THREE.DoubleSide, envMapIntensity:0.3 });
+    } else if(/^(Wall|Gable)/i.test(nm)){
+      o.material = new THREE.MeshStandardMaterial({ map:TEX_WALL, roughness:0.95, metalness:0.0, side:THREE.DoubleSide, envMapIntensity:0.25 });
+    } else if(/^Roof/i.test(nm)){
+      o.material = new THREE.MeshStandardMaterial({ map:TEX_ROOF, roughness:0.7, metalness:0.5, side:THREE.DoubleSide, envMapIntensity:0.55 });
     }
     // build collider only for things at body height (skip floor, roof, beams, ceilings)
     box.setFromObject(o);
