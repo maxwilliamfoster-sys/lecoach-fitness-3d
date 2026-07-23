@@ -28,6 +28,26 @@
   #crosshair { position:fixed; top:50%; left:50%; width:6px; height:6px; margin:-3px 0 0 -3px; z-index:10;
                border-radius:50%; background:rgba(255,255,255,.55); pointer-events:none; display:none; }
   #help { position:fixed; right:16px; bottom:14px; z-index:10; font-size:.72rem; color:#6b7079; text-align:right; pointer-events:none; }
+  /* ---- design mode ---- */
+  #designBtn { position:fixed; top:12px; left:50%; transform:translateX(-50%); z-index:25;
+    background:rgba(20,22,28,.85); color:var(--accent); border:1px solid rgba(232,176,75,.5);
+    padding:7px 16px; border-radius:8px; font-size:.85rem; font-weight:600; cursor:pointer; backdrop-filter:blur(6px); }
+  #designBtn:hover { background:rgba(232,176,75,.15); }
+  #design { position:fixed; inset:0; z-index:30; display:none; background:#0d0f13; }
+  #design.on { display:flex; }
+  #plan { flex:1; height:100%; cursor:crosshair; background:#12141a; touch-action:none; }
+  #dpanel { width:310px; height:100%; overflow:auto; background:#15171d; border-left:1px solid #262a33; padding:16px; color:#cfd3da; }
+  #dpanel h3 { color:var(--accent); margin-bottom:8px; font-size:1rem; }
+  #dpanel .hint { font-size:.78rem; color:#8a909b; line-height:1.55; margin-bottom:12px; }
+  #rlist { font-size:.8rem; margin-bottom:12px; }
+  #rlist .r { padding:6px 8px; background:#1c1f27; border-radius:6px; margin-bottom:6px; border-left:3px solid var(--accent); }
+  #rlist .r b { color:#e8b04b; }
+  .brow { display:flex; gap:8px; margin-bottom:8px; }
+  #dpanel button { flex:1; background:#232733; color:#dfe3ea; border:1px solid #333844; border-radius:7px; padding:9px; font-size:.8rem; cursor:pointer; }
+  #dpanel button:hover { background:#2c3140; }
+  #dCopy { border-color:#4a5a33 !important; color:#cfe8a0 !important; }
+  #dExit { width:100%; background:#3a2020; border-color:#5a2c2c; color:#f0c0c0; margin-top:6px; }
+  #dcoords { font-size:.72rem; color:#6b7079; margin-top:10px; text-align:center; }
 </style>
 </head>
 <body>
@@ -35,6 +55,20 @@
 <div id="crosshair"></div>
 <div id="hud"><span id="coords" style="color:#6b7079">loading…</span></div>
 <div id="help">WASD / arrows move · Mouse look · Shift sprint · Esc release</div>
+<button id="designBtn">✏️ Design mode</button>
+<div id="design">
+  <canvas id="plan"></canvas>
+  <div id="dpanel">
+    <h3>Design mode — draw the rooms</h3>
+    <p class="hint">Drag on the plan to outline a room, then name it. This is the real building (40 × 23.8&nbsp;m, grid = 2&nbsp;m). <b>Front / entrance</b> (car park &amp; reception door) is at the <b>bottom</b>. When done, hit <b>Copy layout text</b> and paste it to me — or <b>Save image</b> and attach it — then tell me what each area is.</p>
+    <div id="rlist"></div>
+    <div class="brow"><button id="dUndo">↩ Undo</button><button id="dClear">🗑 Clear</button></div>
+    <div class="brow"><button id="dCopy">📋 Copy layout text</button></div>
+    <div class="brow"><button id="dPng">🖼 Save image</button></div>
+    <button id="dExit">✕ Close design mode</button>
+    <div id="dcoords">—</div>
+  </div>
+</div>
 <div id="overlay">
   <h1>LE COACH <span>FITNESS</span></h1>
   <p>2 Winship Road, Milton, Cambridge · First-person 3D walkthrough</p>
@@ -195,6 +229,81 @@ addEventListener('resize',()=>{
   camera.aspect=innerWidth/innerHeight; camera.updateProjectionMatrix();
   renderer.setSize(innerWidth,innerHeight); composer.setSize(innerWidth,innerHeight);
 });
+
+// ================= DESIGN MODE — draw room outlines on a to-scale plan =================
+(function(){
+  const Wm=40.05, Dm=23.77, X0m=-20.025, X1m=20.025, Y0m=-11.885, Y1m=11.885;
+  const cv=document.getElementById('plan'), ctx=cv.getContext('2d');
+  const wrap=document.getElementById('design'), btn=document.getElementById('designBtn');
+  const rlist=document.getElementById('rlist'), dco=document.getElementById('dcoords');
+  let rects=[], cur=null, geom=null;
+
+  function layout(){
+    const r=cv.getBoundingClientRect(); cv.width=r.width; cv.height=r.height;
+    const pad=46, s=Math.min((cv.width-2*pad)/Wm,(cv.height-2*pad)/Dm);
+    geom={ s, ox:(cv.width-Wm*s)/2, oy:(cv.height-Dm*s)/2 };
+  }
+  const mx=xm=>geom.ox+(xm-X0m)*geom.s, my=ym=>geom.oy+(Y1m-ym)*geom.s;
+  const ix=px=>X0m+(px-geom.ox)/geom.s, iy=py=>Y1m-(py-geom.oy)/geom.s;
+  const cX=v=>Math.max(X0m,Math.min(X1m,v)), cY=v=>Math.max(Y0m,Math.min(Y1m,v));
+  function pos(cx,cy){
+    const v=cy>4?'back':(cy<-4?'front':'mid'), h=cx<-7?'left':(cx>7?'right':'centre');
+    if(v==='mid'&&h==='centre')return 'centre'; if(v==='mid')return h; if(h==='centre')return v; return v+'-'+h;
+  }
+  function draw(){
+    if(!geom)layout();
+    ctx.clearRect(0,0,cv.width,cv.height);
+    ctx.lineWidth=1;
+    for(let x=Math.ceil(X0m/2)*2;x<=X1m;x+=2){ ctx.strokeStyle=x%10===0?'#2a2f3a':'#1c2029'; ctx.beginPath();ctx.moveTo(mx(x),my(Y1m));ctx.lineTo(mx(x),my(Y0m));ctx.stroke(); }
+    for(let y=Math.ceil(Y0m/2)*2;y<=Y1m;y+=2){ ctx.strokeStyle=y%10===0?'#2a2f3a':'#1c2029'; ctx.beginPath();ctx.moveTo(mx(X0m),my(y));ctx.lineTo(mx(X1m),my(y));ctx.stroke(); }
+    ctx.strokeStyle='#7d828c'; ctx.lineWidth=2; ctx.strokeRect(mx(X0m),my(Y1m),Wm*geom.s,Dm*geom.s);
+    ctx.fillStyle='#2a6cff'; const dw=1.6*geom.s; ctx.fillRect(mx(0)-dw/2,my(Y0m)-3,dw,7);
+    ctx.fillStyle='#8a909b'; ctx.font='12px Segoe UI'; ctx.textAlign='center';
+    ctx.fillText('▲ FRONT · ENTRANCE / RECEPTION DOOR', mx(0), my(Y0m)+22);
+    ctx.fillText('BACK', mx(0), my(Y1m)-8);
+    rects.concat(cur?[cur]:[]).forEach((r,i)=>{
+      const x=mx(Math.min(r.x0,r.x1)), y=my(Math.max(r.y0,r.y1));
+      const w=Math.abs(r.x1-r.x0)*geom.s, h=Math.abs(r.y1-r.y0)*geom.s;
+      ctx.fillStyle='rgba(232,176,75,0.14)'; ctx.strokeStyle='#e8b04b'; ctx.lineWidth=2;
+      ctx.fillRect(x,y,w,h); ctx.strokeRect(x,y,w,h);
+      ctx.fillStyle='#e8b04b'; ctx.font='bold 13px Segoe UI';
+      ctx.fillText(r.label||('#'+(i+1)), x+w/2, y+h/2);
+      ctx.fillStyle='#cfd3da'; ctx.font='11px Segoe UI';
+      ctx.fillText(Math.abs(r.x1-r.x0).toFixed(1)+'×'+Math.abs(r.y1-r.y0).toFixed(1)+'m', x+w/2, y+h/2+15);
+    });
+  }
+  function renderList(){
+    rlist.innerHTML = rects.length ? rects.map((r,i)=>{
+      const w=Math.abs(r.x1-r.x0).toFixed(1), d=Math.abs(r.y1-r.y0).toFixed(1);
+      return '<div class="r"><b>'+(r.label||('#'+(i+1)))+'</b> — '+w+'×'+d+' m · '+pos((r.x0+r.x1)/2,(r.y0+r.y1)/2)+'</div>';
+    }).join('') : '<div style="color:#6b7079">No rooms drawn yet.</div>';
+  }
+  let down=false;
+  cv.addEventListener('pointerdown',e=>{ const b=cv.getBoundingClientRect(); down=true;
+    const x=cX(ix(e.clientX-b.left)), y=cY(iy(e.clientY-b.top)); cur={x0:x,y0:y,x1:x,y1:y}; });
+  cv.addEventListener('pointermove',e=>{ const b=cv.getBoundingClientRect();
+    const x=cX(ix(e.clientX-b.left)), y=cY(iy(e.clientY-b.top)); dco.textContent='x '+x.toFixed(1)+'  y '+y.toFixed(1)+' m';
+    if(down&&cur){ cur.x1=x; cur.y1=y; draw(); } });
+  addEventListener('pointerup',()=>{ if(down&&cur){ down=false;
+    if(Math.abs(cur.x1-cur.x0)>0.6&&Math.abs(cur.y1-cur.y0)>0.6){
+      const nm=prompt('Name this area (optional):','');
+      const x0=Math.min(cur.x0,cur.x1),x1=Math.max(cur.x0,cur.x1),y0=Math.min(cur.y0,cur.y1),y1=Math.max(cur.y0,cur.y1);
+      rects.push({label:(nm&&nm.trim())?nm.trim():('#'+(rects.length+1)),x0,y0,x1,y1});
+    }
+    cur=null; draw(); renderList(); } });
+  document.getElementById('dUndo').onclick=()=>{rects.pop();draw();renderList();};
+  document.getElementById('dClear').onclick=()=>{if(confirm('Clear all rooms?')){rects=[];draw();renderList();}};
+  document.getElementById('dCopy').onclick=()=>{
+    let t='LE COACH ROOM LAYOUT — metres. Building 40.05 wide (x: -20.025 left .. +20.025 right) x 23.77 deep (y: -11.885 FRONT/entrance .. +11.885 back).';
+    rects.forEach((r,i)=>{ t+='\n'+(i+1)+'. '+r.label+': x ['+r.x0.toFixed(1)+' .. '+r.x1.toFixed(1)+'], y ['+r.y0.toFixed(1)+' .. '+r.y1.toFixed(1)+']  ('+(r.x1-r.x0).toFixed(1)+' x '+(r.y1-r.y0).toFixed(1)+' m, '+pos((r.x0+r.x1)/2,(r.y0+r.y1)/2)+')'; });
+    t+='\nJSON: '+JSON.stringify(rects.map(r=>({label:r.label,x0:+r.x0.toFixed(2),x1:+r.x1.toFixed(2),y0:+r.y0.toFixed(2),y1:+r.y1.toFixed(2)})));
+    navigator.clipboard.writeText(t).then(()=>{dco.textContent='✓ Layout copied — paste it to Claude';},()=>{prompt('Copy this text and paste to Claude:',t);});
+  };
+  document.getElementById('dPng').onclick=()=>{ draw(); const a=document.createElement('a'); a.download='lecoach_layout.png'; a.href=cv.toDataURL('image/png'); a.click(); dco.textContent='✓ Image saved — attach it to Claude'; };
+  btn.onclick=()=>{ wrap.classList.add('on'); try{controls.unlock();}catch(e){} layout(); draw(); renderList(); };
+  document.getElementById('dExit').onclick=()=>wrap.classList.remove('on');
+  addEventListener('resize',()=>{ if(wrap.classList.contains('on')){ layout(); draw(); } });
+})();
 </script>
 </body>
 </html>
