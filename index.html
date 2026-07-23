@@ -238,7 +238,23 @@ addEventListener('resize',()=>{
 
 // ================= DESIGN MODE — draw room outlines on a to-scale plan =================
 (function(){
-  const Wm=40.05, Dm=23.77, X0m=-20.025, X1m=20.025, Y0m=-11.885, Y1m=11.885;
+  // plan extents include the OUTWARD front extension (front now at -16.885)
+  const PX0=-20.025, PX1=20.025, PY0=-16.885, PY1=11.885;
+  const PWm=PX1-PX0, PDm=PY1-PY0;
+  // current building outline pieces (main warehouse + protruding front extension)
+  const OUTLINE=[
+    {x0:-20.025,y0:-11.885,x1:20.025,y1:11.885},   // main warehouse (40x24)
+    {x0:-20.025,y0:-16.885,x1:10,   y1:-11.885},   // front extension (protrudes out)
+  ];
+  // existing rooms already built (grey base layer)
+  const EXIST=[
+    {l:'LEG ROOM',        x0:-20.025,y0:0,      x1:-10,   y1:11.885},
+    {l:'(sealed)',        x0:-10,    y0:0,      x1:10,    y1:11.885},
+    {l:'FUNCTIONAL ROOM', x0:10,     y0:-11.885,x1:20.025,y1:11.885},
+    {l:'MAIN ROOM',       x0:-20.025,y0:-11.885,x1:10,    y1:0},
+    {l:'RECEPTION',       x0:-3.5,   y0:-16.885,x1:10,    y1:-11.885},
+    {l:'TOILETS & LOCKERS',x0:-20.025,y0:-16.885,x1:-3.5, y1:-11.885},
+  ];
   const cv=document.getElementById('plan'), ctx=cv.getContext('2d');
   const wrap=document.getElementById('design'), btn=document.getElementById('designBtn');
   const rlist=document.getElementById('rlist'), dco=document.getElementById('dcoords');
@@ -246,27 +262,40 @@ addEventListener('resize',()=>{
 
   function layout(){
     const r=cv.getBoundingClientRect(); cv.width=r.width; cv.height=r.height;
-    const pad=46, s=Math.min((cv.width-2*pad)/Wm,(cv.height-2*pad)/Dm);
-    geom={ s, ox:(cv.width-Wm*s)/2, oy:(cv.height-Dm*s)/2 };
+    const pad=46, s=Math.min((cv.width-2*pad)/PWm,(cv.height-2*pad)/PDm);
+    geom={ s, ox:(cv.width-PWm*s)/2, oy:(cv.height-PDm*s)/2 };
   }
-  const mx=xm=>geom.ox+(xm-X0m)*geom.s, my=ym=>geom.oy+(Y1m-ym)*geom.s;
-  const ix=px=>X0m+(px-geom.ox)/geom.s, iy=py=>Y1m-(py-geom.oy)/geom.s;
-  const cX=v=>Math.max(X0m,Math.min(X1m,v)), cY=v=>Math.max(Y0m,Math.min(Y1m,v));
+  const mx=xm=>geom.ox+(xm-PX0)*geom.s, my=ym=>geom.oy+(PY1-ym)*geom.s;
+  const ix=px=>PX0+(px-geom.ox)/geom.s, iy=py=>PY1-(py-geom.oy)/geom.s;
+  const cX=v=>Math.max(PX0,Math.min(PX1,v)), cY=v=>Math.max(PY0,Math.min(PY1,v));
   function pos(cx,cy){
-    const v=cy>4?'back':(cy<-4?'front':'mid'), h=cx<-7?'left':(cx>7?'right':'centre');
+    const v=cy>4?'back':(cy<-9?'extension':(cy<-4?'front':'mid')), h=cx<-7?'left':(cx>7?'right':'centre');
     if(v==='mid'&&h==='centre')return 'centre'; if(v==='mid')return h; if(h==='centre')return v; return v+'-'+h;
+  }
+  function rrect(r,fill,stroke,lab,labcol){
+    const x=mx(Math.min(r.x0,r.x1)), y=my(Math.max(r.y0,r.y1));
+    const w=Math.abs(r.x1-r.x0)*geom.s, h=Math.abs(r.y1-r.y0)*geom.s;
+    if(fill){ ctx.fillStyle=fill; ctx.fillRect(x,y,w,h); }
+    if(stroke){ ctx.strokeStyle=stroke; ctx.lineWidth=2; ctx.strokeRect(x,y,w,h); }
+    if(lab){ ctx.fillStyle=labcol; ctx.font='bold 12px Segoe UI'; ctx.textAlign='center'; ctx.fillText(lab,x+w/2,y+h/2); }
   }
   function draw(){
     if(!geom)layout();
     ctx.clearRect(0,0,cv.width,cv.height);
     ctx.lineWidth=1;
-    for(let x=Math.ceil(X0m/2)*2;x<=X1m;x+=2){ ctx.strokeStyle=x%10===0?'#2a2f3a':'#1c2029'; ctx.beginPath();ctx.moveTo(mx(x),my(Y1m));ctx.lineTo(mx(x),my(Y0m));ctx.stroke(); }
-    for(let y=Math.ceil(Y0m/2)*2;y<=Y1m;y+=2){ ctx.strokeStyle=y%10===0?'#2a2f3a':'#1c2029'; ctx.beginPath();ctx.moveTo(mx(X0m),my(y));ctx.lineTo(mx(X1m),my(y));ctx.stroke(); }
-    ctx.strokeStyle='#7d828c'; ctx.lineWidth=2; ctx.strokeRect(mx(X0m),my(Y1m),Wm*geom.s,Dm*geom.s);
-    ctx.fillStyle='#2a6cff'; const dw=1.6*geom.s; ctx.fillRect(mx(0)-dw/2,my(Y0m)-3,dw,7);
+    for(let x=Math.ceil(PX0/2)*2;x<=PX1;x+=2){ ctx.strokeStyle=x%10===0?'#2a2f3a':'#1c2029'; ctx.beginPath();ctx.moveTo(mx(x),my(PY1));ctx.lineTo(mx(x),my(PY0));ctx.stroke(); }
+    for(let y=Math.ceil(PY0/2)*2;y<=PY1;y+=2){ ctx.strokeStyle=y%10===0?'#2a2f3a':'#1c2029'; ctx.beginPath();ctx.moveTo(mx(PX0),my(y));ctx.lineTo(mx(PX1),my(y));ctx.stroke(); }
+    // existing rooms (grey base layer)
+    EXIST.forEach(r=>rrect(r,'rgba(130,140,155,0.10)','rgba(150,158,170,0.30)',r.l,'#8f96a3'));
+    // building outline (main + extension)
+    ctx.strokeStyle='#9aa0aa'; ctx.lineWidth=2.5;
+    OUTLINE.forEach(o=>ctx.strokeRect(mx(o.x0),my(o.y1),Math.abs(o.x1-o.x0)*geom.s,Math.abs(o.y1-o.y0)*geom.s));
+    // entrance door on the extension outer wall
+    ctx.fillStyle='#2a6cff'; const dw=1.6*geom.s; ctx.fillRect(mx(0)-dw/2,my(PY0)-3,dw,7);
     ctx.fillStyle='#8a909b'; ctx.font='12px Segoe UI'; ctx.textAlign='center';
-    ctx.fillText('▲ FRONT · ENTRANCE / RECEPTION DOOR', mx(0), my(Y0m)+22);
-    ctx.fillText('BACK', mx(0), my(Y1m)-8);
+    ctx.fillText('▲ FRONT · ENTRANCE (extension)', mx(0), my(PY0)+22);
+    ctx.fillText('BACK', mx(0), my(PY1)-8);
+    // user-drawn new rooms (gold, on top)
     rects.concat(cur?[cur]:[]).forEach((r,i)=>{
       const x=mx(Math.min(r.x0,r.x1)), y=my(Math.max(r.y0,r.y1));
       const w=Math.abs(r.x1-r.x0)*geom.s, h=Math.abs(r.y1-r.y0)*geom.s;
@@ -300,7 +329,7 @@ addEventListener('resize',()=>{
   document.getElementById('dUndo').onclick=()=>{rects.pop();draw();renderList();};
   document.getElementById('dClear').onclick=()=>{if(confirm('Clear all rooms?')){rects=[];draw();renderList();}};
   document.getElementById('dCopy').onclick=()=>{
-    let t='LE COACH ROOM LAYOUT — metres. Building 40.05 wide (x: -20.025 left .. +20.025 right) x 23.77 deep (y: -11.885 FRONT/entrance .. +11.885 back).';
+    let t='LE COACH NEW ROOMS — metres. x: -20.025 left .. +20.025 right. y: -16.885 extension front .. -11.885 warehouse front .. +11.885 back. (Existing: leg room back-left, functional room right full-depth, main room front-open, reception+toilets in the front extension.)';
     rects.forEach((r,i)=>{ t+='\n'+(i+1)+'. '+r.label+': x ['+r.x0.toFixed(1)+' .. '+r.x1.toFixed(1)+'], y ['+r.y0.toFixed(1)+' .. '+r.y1.toFixed(1)+']  ('+(r.x1-r.x0).toFixed(1)+' x '+(r.y1-r.y0).toFixed(1)+' m, '+pos((r.x0+r.x1)/2,(r.y0+r.y1)/2)+')'; });
     t+='\nJSON: '+JSON.stringify(rects.map(r=>({label:r.label,x0:+r.x0.toFixed(2),x1:+r.x1.toFixed(2),y0:+r.y0.toFixed(2),y1:+r.y1.toFixed(2)})));
     navigator.clipboard.writeText(t).then(()=>{dco.textContent='✓ Layout copied — paste it to Claude';},()=>{prompt('Copy this text and paste to Claude:',t);});
