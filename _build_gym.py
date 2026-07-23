@@ -1,4 +1,5 @@
-import bpy, bmesh, os
+import bpy, bmesh, math
+from mathutils import Vector
 
 # ---------------- reset ----------------
 bpy.ops.wm.read_factory_settings(use_empty=True)
@@ -10,18 +11,16 @@ def M(n,rgba,r=0.9,me=0.0):
     b=m.node_tree.nodes.get('Principled BSDF')
     b.inputs['Base Color'].default_value=rgba; b.inputs['Roughness'].default_value=r; b.inputs['Metallic'].default_value=me
     m.diffuse_color=rgba; return m
-m_floor=M('Floor',(0.11,0.11,0.12,1)); m_wall=M('WallExt',(0.10,0.10,0.11,1))
-m_part=M('Partition',(0.14,0.14,0.15,1)); m_blue=M('Blue',(0.03,0.11,0.55,1),0.5)
-m_white=M('WetWhite',(0.90,0.90,0.90,1),0.7); m_wood=M('WoodPlat',(0.42,0.28,0.15,1),0.6)
-m_ceil=M('Ceiling',(0.09,0.09,0.10,1),0.95); m_steel=M('Steel',(0.28,0.30,0.34,1),0.5,0.7)
-m_txt=M('Label',(0.95,0.85,0.35,1),0.5)
+m_floor=M('Floor',(0.12,0.12,0.13,1)); m_wall=M('WallExt',(0.13,0.13,0.14,1))
+m_roof=M('Roof',(0.10,0.11,0.12,1),0.6,0.4); m_steel=M('Steel',(0.30,0.32,0.36,1),0.5,0.7)
+m_blue=M('Blue',(0.03,0.11,0.55,1),0.5)
 
-# ---- REAL footprint: 3 units side-by-side = ~40m wide x 23.77m deep ----
-UNIT=13.35; W=3*UNIT            # 40.05 wide (X, frontage)
-D=23.77                        # deep (Y): front(entrance)=-D/2 .. back=+D/2
-X0,X1=-W/2,W/2; Y0,Y1=-D/2,D/2
-HGT=3.6; TE=0.2; H=3.0; TP=0.15
-FRONT=Y0                       # entrance frontage (faces car park)
+# ---- REAL shell: 3 units x 13.35m = 40.05m wide x 23.77m deep ----
+UNIT=13.35; W=3*UNIT; D=23.77
+X0,X1=-W/2,W/2; Y0,Y1=-D/2,D/2      # front(entrance)=Y0 ; back=Y1
+EAVE,APEX=3.5,5.0; TE=0.2
+centers=[-UNIT,0.0,UNIT]                     # ridge x of each unit
+bounds=[-W/2,-UNIT/2,UNIT/2,W/2]             # -20.025,-6.675,6.675,20.025
 
 def box(n,sx,sy,sz,x,y,z,m):
     bpy.ops.mesh.primitive_cube_add(size=1,location=(x,y,z))
@@ -29,97 +28,61 @@ def box(n,sx,sy,sz,x,y,z,m):
     bpy.ops.object.transform_apply(scale=True); o.data.materials.append(m)
     for c in o.users_collection: c.objects.unlink(o)
     col.objects.link(o); return o
-def wallX(n,xa,xb,y,m,gaps=(),h=H,t=TP):
-    xa,xb=min(xa,xb),max(xa,xb); cuts=sorted((c-w/2,c+w/2) for c,w in gaps); segs=[];cur=xa
-    for a,b in cuts:
-        if a>cur: segs.append((cur,a))
-        cur=max(cur,b)
-    if cur<xb: segs.append((cur,xb))
-    for i,(a,b) in enumerate(segs):
-        if b-a>0.01: box(f'{n}_{i}',b-a,t,h,(a+b)/2,y,h/2,m)
-def wallY(n,ya,yb,x,m,gaps=(),h=H,t=TP):
-    ya,yb=min(ya,yb),max(ya,yb); cuts=sorted((c-w/2,c+w/2) for c,w in gaps); segs=[];cur=ya
-    for a,b in cuts:
-        if a>cur: segs.append((cur,a))
-        cur=max(cur,b)
-    if cur<yb: segs.append((cur,yb))
-    for i,(a,b) in enumerate(segs):
-        if b-a>0.01: box(f'{n}_{i}',t,b-a,h,x,(a+b)/2,h/2,m)
-def label(txt,x,y,s=0.9):
-    bpy.ops.object.text_add(location=(x,y,0.12)); o=bpy.context.active_object
-    o.name='LBL_'+txt.split()[0]; o.data.body=txt; o.data.size=s
-    o.data.align_x='CENTER'; o.data.align_y='CENTER'; o.data.materials.append(m_txt)
-    for c in o.users_collection: c.objects.unlink(o)
-    col.objects.link(o); return o
+def poly(n,verts,m):
+    me=bpy.data.meshes.new(n); ob=bpy.data.objects.new(n,me); col.objects.link(ob)
+    bm=bmesh.new(); vs=[bm.verts.new(v) for v in verts]; bm.faces.new(vs); bm.to_mesh(me); bm.free()
+    me.materials.append(m); return ob
 
-# ---- envelope (rectangle, flat ceiling ~eaves 3.5m) ----
+# floor
 box('Floor',W,D,0.1,0,0,-0.05,m_floor)
-box('Ceiling',W,D,0.1,0,0,HGT+0.05,m_ceil)
-box('Wall_Front',W,TE,HGT,0,Y0,HGT/2,m_wall)
-box('Wall_Back', W,TE,HGT,0,Y1,HGT/2,m_wall)
-box('Wall_Left', TE,D,HGT,X0,0,HGT/2,m_wall)
-box('Wall_Right',TE,D,HGT,X1,0,HGT/2,m_wall)
-# exposed tie beams (industrial) running front-to-back at the 3 unit lines
-for x in (-UNIT,0,UNIT): box(f'Tie_{int(x)}',0.16,D,0.18,x,0,HGT-0.2,m_steel)
+# side walls (to eave)
+box('Wall_Left', TE,D,EAVE,X0,0,EAVE/2,m_wall)
+box('Wall_Right',TE,D,EAVE,X1,0,EAVE/2,m_wall)
 
-# ================= FRONT LOBBY STRIP (y: Y0 .. -6.5) =================
-LB=-6.5
-# TOILETS / SHOWERS / CHANGING  front-left
-wallY('P_toil_E',Y0,LB,-12.5,m_part,gaps=[(-9.0,1.1)])
-wallX('P_toil_N',X0,-12.5,LB,m_part,gaps=[])
-box('WetFloor',7.5,(LB-Y0),0.04,-16.25,(Y0+LB)/2,0.02,m_white)
-for i in range(4): box(f'Shower_{i}',1.2,1.2,2.0,-19.2+i*1.6,Y0+0.9,1.0,m_white)
-# RECEPTION  front-centre (small, at entrance)
-wallY('P_recep_W',Y0,-8.5,-3,m_part); wallY('P_recep_E',Y0,-8.5,3,m_part)
-wallX('P_recep_N',-3,3,-8.5,m_part,gaps=[(0,1.3)])
-box('ReceptionDesk',3.0,0.7,1.0,0,-9.6,0.5,m_wood)
-box('EntranceMark',1.4,0.05,HGT,0,Y0+0.06,HGT/2,m_blue)
-# OFFICES (two)  front-centre-right
-wallY('P_off_W',Y0,LB,7,m_part); wallY('P_off_E',Y0,LB,13,m_part)
-wallX('P_off_N',7,13,LB,m_part,gaps=[(10,1.0)])
-wallX('P_off_div',7,13,-9.2,m_part,gaps=[(10,0.9)])
-# ARM area  front-right
-wallY('P_arm_E',Y0,LB,17,m_part,gaps=[(-9.0,0.9)])
-wallX('P_arm_N',13,17,LB,m_part,gaps=[(15,0.9)])
+# front & back gable walls following the M-roofline
+def gable_profile(y):
+    # bottom two corners then zig-zag top eave-apex-valley-apex... across X
+    top=[]
+    xs=[X1,centers[2],bounds[2],centers[1],bounds[1],centers[0],X0]
+    zs=[EAVE,APEX,EAVE,APEX,EAVE,APEX,EAVE]
+    for x,z in zip(xs,zs): top.append((x,y,z))
+    return [(X0,y,0),(X1,y,0)]+top
+poly('Wall_Front', gable_profile(Y0), m_wall)
+poly('Wall_Back',  gable_profile(Y1), m_wall)
 
-# ================= DEEP GYM (y: -6.5 .. back) =================
-# LEG ROOM back-left, deep
-wallX('P_leg_S',X0,-9,2.0,m_part,gaps=[(-14.0,2.6)])
-wallY('P_leg_E',2.0,Y1,-9,m_part,gaps=[(7.0,1.3)])
-box('LegPlatform',10.0,8.0,0.06,-14.5,7.0,0.03,m_wood)
-# FUNCTIONAL ROOM right side, deep (big)
-wallY('P_func_W',LB,Y1,9,m_part,gaps=[(-2.0,1.4),(6.0,1.6)])
-box('FuncFloor',11,18.27,0.04,14.5,(LB+Y1)/2,0.02,m_floor)
-# blue accents
-box('Accent_funcW',0.06,18.27,0.25,9,(LB+Y1)/2,0.13,m_blue)
-box('Accent_legE',0.06,9.87,0.25,-9,7.0,0.13,m_blue)
+# roof: 2 slopes per unit (eave->ridge->eave)
+for i,cx in enumerate(centers):
+    lx,rx=bounds[i],bounds[i+1]
+    poly(f'Roof_{i}_L',[(lx,Y0,EAVE),(lx,Y1,EAVE),(cx,Y1,APEX),(cx,Y0,APEX)],m_roof)
+    poly(f'Roof_{i}_R',[(cx,Y0,APEX),(cx,Y1,APEX),(rx,Y1,EAVE),(rx,Y0,EAVE)],m_roof)
+    box(f'Ridge_{i}',0.16,D,0.18,cx,0,APEX-0.1,m_steel)   # ridge beam
+# a few tie beams across the width at eave level
+for gy in (-8,0,8): box(f'Tie_{gy}',W,0.14,0.18,0,gy,EAVE-0.1,m_steel)
 
-# ================= labels (top plan) =================
-label('TOILETS / SHOWERS',-16.25,-9.2,0.6); label('RECEPTION',0,-10.4,0.5)
-label('OFFICE',10,-7.6,0.45); label('OFFICE',10,-10.6,0.45); label('ARM',15,-9,0.45)
-label('LEG ROOM',-14.5,7.0,1.0); label('MAIN ROOM',0,-1.0,1.2); label('FUNCTIONAL ROOM',14.5,3,0.9)
+# entrance: roller shutter + personnel door on the front (centre unit)
+box('RollerShutter',4.8,0.08,3.0,-2.0,Y0-0.05,1.5,m_steel)
+box('EntranceDoor',1.1,0.08,2.2,2.8,Y0-0.05,1.1,m_blue)
 
-# ================= top-down plan render =================
-hide=['Ceiling','Tie_-13','Tie_0','Tie_13']
-for n in hide:
-    o=col.objects.get(n)
-    if o: o.hide_render=True
-cam_data=bpy.data.cameras.new('PlanCam'); cam_data.type='ORTHO'; cam_data.ortho_scale=W+3
-cam=bpy.data.objects.new('PlanCam',cam_data); scene.collection.objects.link(cam)
-cam.location=(0,0,50); cam.rotation_euler=(0,0,0); scene.camera=cam
-scene.render.engine='BLENDER_WORKBENCH'; scene.display.shading.light='FLAT'; scene.display.shading.color_type='MATERIAL'
-scene.render.resolution_x=1600; scene.render.resolution_y=int(1600*(D+3)/(W+3))
+# ---------------- renders ----------------
+# perspective 3/4 exterior to show the shape
+cam_d=bpy.data.cameras.new('Cam'); cam=bpy.data.objects.new('Cam',cam_d); scene.collection.objects.link(cam)
+cam.location=Vector((34,-32,21)); d=Vector((0,0,2))-cam.location
+cam.rotation_euler=d.to_track_quat('-Z','Y').to_euler(); scene.camera=cam
+scene.render.engine='BLENDER_WORKBENCH'; scene.display.shading.light='STUDIO'; scene.display.shading.color_type='MATERIAL'
+scene.render.resolution_x=1500; scene.render.resolution_y=1000
+scene.render.filepath=r"C:\Users\maxwi\Desktop\LeCoach3D\frames\SHELL.png"
+bpy.ops.render.render(write_still=True)
+# top-down footprint
+cam2_d=bpy.data.cameras.new('Top'); cam2_d.type='ORTHO'; cam2_d.ortho_scale=W+3
+cam2=bpy.data.objects.new('Top',cam2_d); scene.collection.objects.link(cam2)
+cam2.location=Vector((0,0,50)); cam2.rotation_euler=(0,0,0); scene.camera=cam2
+scene.render.resolution_y=int(1500*(D+3)/(W+3))
 scene.render.filepath=r"C:\Users\maxwi\Desktop\LeCoach3D\frames\PLAN.png"
 bpy.ops.render.render(write_still=True)
 
-# ================= export =================
-for n in hide:
-    o=col.objects.get(n)
-    if o: o.hide_render=False
-for o in list(col.objects):
-    if o.name.startswith('LBL_'): bpy.data.objects.remove(o,do_unlink=True)
+# ---------------- export ----------------
 for o in bpy.data.objects: o.select_set(o.type=='MESH')
 bpy.ops.export_scene.gltf(filepath=r"C:\Users\maxwi\Desktop\LeCoach3D\lecoach_gym.glb",
                           export_format='GLB',use_selection=True,export_apply=True,export_yup=True)
 bpy.ops.wm.save_as_mainfile(filepath=r"C:\Users\maxwi\Desktop\LeCoach3D\lecoach_gym.blend")
-print("BUILD_DONE objects:",len(col.objects),"footprint",round(W,2),"x",D)
+print("SHELL_DONE objects:",len(col.objects),"footprint",round(W,2),"x",D,"eave",EAVE,"apex",APEX)
