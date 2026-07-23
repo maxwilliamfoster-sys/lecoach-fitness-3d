@@ -2,6 +2,9 @@
 video/
 frames/
 
+# Third-party planning documents (neighbouring unit) — reference only, not ours to republish
+research/
+
 # Blender backups
 *.blend1
 *.blend2
