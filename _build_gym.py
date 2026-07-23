@@ -59,9 +59,9 @@ for i,cx in enumerate(centers):
 # a few tie beams across the width at eave level
 for gy in (-8,0,8): box(f'Tie_{gy}',W,0.14,0.18,0,gy,EAVE-0.1,m_steel)
 
-# entrance: roller shutter + personnel door on the front (centre unit)
-box('RollerShutter',4.8,0.08,3.0,-2.0,Y0-0.05,1.5,m_steel)
-box('EntranceDoor',1.1,0.08,2.2,2.8,Y0-0.05,1.1,m_blue)
+# entrance: little personnel door DEAD CENTRE (marks reception); roller shutter off to the side
+box('EntranceDoor',1.2,0.10,2.2,0.0,Y0-0.06,1.1,m_blue)     # centred front door = reception
+box('RollerShutter',4.8,0.08,3.0,-9.0,Y0-0.05,1.5,m_steel)
 
 # ---------------- renders ----------------
 # perspective 3/4 exterior to show the shape
