@@ -254,11 +254,12 @@ addEventListener('resize',()=>{
   // existing rooms already built (grey base layer)
   const EXIST=[
     {l:'LEG ROOM',        x0:-20.025,y0:0,      x1:-10,   y1:11.885},
-    {l:'(sealed)',        x0:-10,    y0:0,      x1:10,    y1:11.885},
+    {l:'BACK ROOM',       x0:-10,    y0:0,      x1:10,    y1:11.885},
     {l:'FUNCTIONAL ROOM', x0:10,     y0:-11.885,x1:20.025,y1:11.885},
     {l:'MAIN ROOM',       x0:-20.025,y0:-11.885,x1:10,    y1:0},
-    {l:'RECEPTION',       x0:-3.5,   y0:-16.885,x1:10,    y1:-11.885},
+    {l:'RECEPTION',       x0:-3.5,   y0:-16.885,x1:4,     y1:-11.885},
     {l:'TOILETS & LOCKERS',x0:-20.025,y0:-16.885,x1:-3.5, y1:-11.885},
+    {l:'ROOM (ext right)',x0:4,      y0:-16.885,x1:10,    y1:-11.885},
   ];
   const cv=document.getElementById('plan'), ctx=cv.getContext('2d');
   const wrap=document.getElementById('design'), btn=document.getElementById('designBtn');

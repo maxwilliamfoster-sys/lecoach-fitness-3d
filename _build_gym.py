@@ -82,14 +82,15 @@ for gy in (-8,0,8): box(f'Tie_{gy}',W,0.14,0.18,0,gy,EAVE-0.1,m_steel)
 box('EntranceDoor',1.2,0.10,2.2,0.0,EYF-0.06,1.1,m_blue)          # on extension outer wall
 box('RollerShutter',4.8,0.08,3.0,15.0,Y0-0.05,1.5,m_steel)        # functional room front
 
-# ==================== INTERIOR ROOMS ====================
-# LEG ROOM back-left
-wallX('Wall_LegS', X0, -10, 0.0, m_wall, gaps=[(-14.0,1.6)])
-wallY('Wall_LegE', 0.0, Y1, -10, m_wall)
-# FUNCTIONAL ROOM right, full depth
-wallY('Wall_FuncW', Y0, Y1, 10, m_wall, gaps=[(-4.0,1.6),(5.0,1.6)])
-# solid wall across the back-centre (sealed)
-wallX('Wall_MidBack', -10, 10, 0.0, m_wall)
+# ==================== INTERIOR (from user's design-mode walls) ====================
+# y=0 partition: leg-room opening at x[-18..-12]; door into the back room at x=1
+wallX('Wall_y0a', X0, -18, 0.0, m_wall)
+wallX('Wall_y0b', -12, 10, 0.0, m_wall, gaps=[(1.0,1.6)])
+# x=-10 partition (leg room east / back room west, solid)
+wallY('Wall_xm10', 0.0, Y1, -10, m_wall)
+# x=10 partition (functional room west): single opening at y[-6..-2]
+wallY('Wall_x10a', Y0, -6, 10, m_wall)
+wallY('Wall_x10b', -2, Y1, 10, m_wall)
 
 # ==================== FRONT EXTENSION (protruding OUTWARD) ====================
 box('Floor_Ext', EXR-EXL, Y0-EYF, 0.1, (EXL+EXR)/2, (EYF+Y0)/2, -0.05, m_floor)
@@ -97,13 +98,14 @@ box('Ceil_Ext',  EXR-EXL, Y0-EYF, 0.12,(EXL+EXR)/2, (EYF+Y0)/2, EH+0.06, m_wall)
 wallX('Wall_ExtFront', EXL, EXR, EYF, m_wall, gaps=[(0,1.6)], h=EH, t=TE)          # outer wall + entrance door
 box('Wall_ExtLeft', TE, Y0-EYF, EH, EXL, (EYF+Y0)/2, EH/2, m_wall)
 box('Wall_ExtRight',TE, Y0-EYF, EH, EXR, (EYF+Y0)/2, EH/2, m_wall)
-# divider: TOILETS & LOCKERS (left) | RECEPTION (middle-right)
-wallY('Wall_ExtDiv', EYF, Y0, -3.5, m_wall, gaps=[(-14.4,1.2)])
+# extension dividers: TOILETS/LOCKERS (left) | RECEPTION (mid) | right room
+wallY('Wall_ExtDivL', EYF, Y0, -3.5, m_wall, gaps=[(-14.4,1.2)])   # toilets <-> reception door
+wallY('Wall_ExtDivR', EYF, Y0, 4.0,  m_wall)                       # reception | right room (solid)
 
 # ---- labels ----
-label('LEG ROOM',-15,6,1.0); label('MAIN ROOM',3,-4,1.1)
-label('FUNCTIONAL ROOM',15,0,0.95); label('(sealed)',0,6,0.7)
-label('RECEPTION',3,-14.4,0.65); label('TOILETS & LOCKERS',-11.7,-14.4,0.6)
+label('LEG ROOM',-15,6,1.0); label('MAIN ROOM',0,-6,1.1)
+label('FUNCTIONAL ROOM',15,2,0.9); label('BACK ROOM',0,6,0.9)
+label('RECEPTION',0.25,-14.4,0.55); label('TOILETS & LOCKERS',-11.7,-14.4,0.55); label('ROOM',7,-14.4,0.5)
 
 # ---- top-down plan render (frames extension too) ----
 hide=[o.name for o in col.objects if o.name.startswith(('Roof_','Ridge_','Tie_','Ceil_'))]
