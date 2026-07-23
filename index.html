@@ -47,6 +47,8 @@
   #dpanel button { flex:1; background:#232733; color:#dfe3ea; border:1px solid #333844; border-radius:7px; padding:9px; font-size:.8rem; cursor:pointer; }
   #dpanel button:hover { background:#2c3140; }
   #dCopy { border-color:#4a5a33 !important; color:#cfe8a0 !important; }
+  #dpanel .tool { font-size:.75rem; padding:8px 3px; }
+  #dpanel .tool.active { background:#e8b04b; color:#151515; border-color:#e8b04b; font-weight:700; }
   #dExit { width:100%; background:#3a2020; border-color:#5a2c2c; color:#f0c0c0; margin-top:6px; }
   #dcoords { font-size:.72rem; color:#6b7079; margin-top:10px; text-align:center; }
 </style>
@@ -61,7 +63,10 @@
   <canvas id="plan"></canvas>
   <div id="dpanel">
     <h3>Design mode — draw the rooms</h3>
-    <p class="hint">Drag on the plan to outline a room, then name it. This is the real building (40 × 23.8&nbsp;m, grid = 2&nbsp;m). <b>Front / entrance</b> (car park &amp; reception door) is at the <b>bottom</b>. When done, hit <b>Copy layout text</b> and paste it to me — or <b>Save image</b> and attach it — then tell me what each area is.</p>
+    <p class="hint">Pick a tool, then draw on the plan (grid = 2&nbsp;m). Existing rooms show <span style="color:#8f96a3">grey</span>; your edits <span style="color:#e8b04b">gold</span>.<br><b>▭ Room</b> drag a box · <b>▚ Wall</b> drag a line · <b>▯ Door</b> click · <b>✂ Cut</b> click a shape or a grey room to remove it · <b>⊹ Move</b> drag to move (Delete key removes). Then <b>Copy layout text</b> (paste to me) or <b>Save image</b>.</p>
+    <div style="font-size:.72rem;color:#8a909b;margin-bottom:5px;">Tools</div>
+    <div class="brow"><button class="tool active" data-tool="room">▭ Room</button><button class="tool" data-tool="wall">▚ Wall</button></div>
+    <div class="brow"><button class="tool" data-tool="door">▯ Door</button><button class="tool" data-tool="cut">✂ Cut</button><button class="tool" data-tool="select">⊹ Move</button></div>
     <div id="rlist"></div>
     <div class="brow"><button id="dUndo">↩ Undo</button><button id="dClear">🗑 Clear</button></div>
     <div class="brow"><button id="dCopy">📋 Copy layout text</button></div>
@@ -258,7 +263,13 @@ addEventListener('resize',()=>{
   const cv=document.getElementById('plan'), ctx=cv.getContext('2d');
   const wrap=document.getElementById('design'), btn=document.getElementById('designBtn');
   const rlist=document.getElementById('rlist'), dco=document.getElementById('dcoords');
-  let rects=[], cur=null, geom=null;
+  let shapes=[], cur=null, geom=null, tool='room', sel=null, drag=null; const cut=new Set();
+  const snap=v=>Math.round(v*4)/4;
+  function distSeg(px,py,ax,ay,bx,by){const dx=bx-ax,dy=by-ay,L=dx*dx+dy*dy||1e-9;let t=((px-ax)*dx+(py-ay)*dy)/L;t=Math.max(0,Math.min(1,t));return Math.hypot(px-(ax+t*dx),py-(ay+t*dy));}
+  function inR(r,x,y){return x>=Math.min(r.x0,r.x1)&&x<=Math.max(r.x0,r.x1)&&y>=Math.min(r.y0,r.y1)&&y<=Math.max(r.y0,r.y1);}
+  function pick(x,y){for(let i=shapes.length-1;i>=0;i--){const s=shapes[i];if(s.type==='room'&&inR(s,x,y))return i;if(s.type==='wall'&&distSeg(x,y,s.x0,s.y0,s.x1,s.y1)<0.6)return i;if(s.type==='door'&&Math.hypot(s.x-x,s.y-y)<0.9)return i;}return -1;}
+  function pickExist(x,y){for(let i=0;i<EXIST.length;i++)if(inR(EXIST[i],x,y))return i;return -1;}
+  document.querySelectorAll('#dpanel .tool').forEach(bt=>bt.onclick=()=>{tool=bt.dataset.tool;document.querySelectorAll('#dpanel .tool').forEach(z=>z.classList.toggle('active',z===bt));dco.textContent='Tool: '+tool;});
 
   function layout(){
     const r=cv.getBoundingClientRect(); cv.width=r.width; cv.height=r.height;
@@ -285,8 +296,9 @@ addEventListener('resize',()=>{
     ctx.lineWidth=1;
     for(let x=Math.ceil(PX0/2)*2;x<=PX1;x+=2){ ctx.strokeStyle=x%10===0?'#2a2f3a':'#1c2029'; ctx.beginPath();ctx.moveTo(mx(x),my(PY1));ctx.lineTo(mx(x),my(PY0));ctx.stroke(); }
     for(let y=Math.ceil(PY0/2)*2;y<=PY1;y+=2){ ctx.strokeStyle=y%10===0?'#2a2f3a':'#1c2029'; ctx.beginPath();ctx.moveTo(mx(PX0),my(y));ctx.lineTo(mx(PX1),my(y));ctx.stroke(); }
-    // existing rooms (grey base layer)
-    EXIST.forEach(r=>rrect(r,'rgba(130,140,155,0.10)','rgba(150,158,170,0.30)',r.l,'#8f96a3'));
+    // existing rooms (grey base layer; red if marked to cut)
+    EXIST.forEach(r=>{ const rm=cut.has(r.l);
+      rrect(r, rm?'rgba(220,70,70,0.15)':'rgba(130,140,155,0.10)', rm?'rgba(230,90,90,0.75)':'rgba(150,158,170,0.30)', rm?('✗ '+r.l):r.l, rm?'#f0a0a0':'#8f96a3'); });
     // building outline (main + extension)
     ctx.strokeStyle='#9aa0aa'; ctx.lineWidth=2.5;
     OUTLINE.forEach(o=>ctx.strokeRect(mx(o.x0),my(o.y1),Math.abs(o.x1-o.x0)*geom.s,Math.abs(o.y1-o.y0)*geom.s));
@@ -295,44 +307,72 @@ addEventListener('resize',()=>{
     ctx.fillStyle='#8a909b'; ctx.font='12px Segoe UI'; ctx.textAlign='center';
     ctx.fillText('▲ FRONT · ENTRANCE (extension)', mx(0), my(PY0)+22);
     ctx.fillText('BACK', mx(0), my(PY1)-8);
-    // user-drawn new rooms (gold, on top)
-    rects.concat(cur?[cur]:[]).forEach((r,i)=>{
-      const x=mx(Math.min(r.x0,r.x1)), y=my(Math.max(r.y0,r.y1));
-      const w=Math.abs(r.x1-r.x0)*geom.s, h=Math.abs(r.y1-r.y0)*geom.s;
-      ctx.fillStyle='rgba(232,176,75,0.14)'; ctx.strokeStyle='#e8b04b'; ctx.lineWidth=2;
-      ctx.fillRect(x,y,w,h); ctx.strokeRect(x,y,w,h);
-      ctx.fillStyle='#e8b04b'; ctx.font='bold 13px Segoe UI';
-      ctx.fillText(r.label||('#'+(i+1)), x+w/2, y+h/2);
-      ctx.fillStyle='#cfd3da'; ctx.font='11px Segoe UI';
-      ctx.fillText(Math.abs(r.x1-r.x0).toFixed(1)+'×'+Math.abs(r.y1-r.y0).toFixed(1)+'m', x+w/2, y+h/2+15);
+    // user shapes (gold) — rooms, walls, doors
+    ctx.textAlign='center';
+    shapes.concat(cur?[cur]:[]).forEach((s,i)=>{
+      const isSel=(i===sel);
+      if(s.type==='wall'){
+        ctx.strokeStyle=isSel?'#ffffff':'#e8b04b'; ctx.lineWidth=isSel?7:5; ctx.lineCap='round';
+        ctx.beginPath(); ctx.moveTo(mx(s.x0),my(s.y0)); ctx.lineTo(mx(s.x1),my(s.y1)); ctx.stroke(); ctx.lineWidth=1;
+      } else if(s.type==='door'){
+        ctx.fillStyle=isSel?'#ffffff':'#4fd08a'; ctx.beginPath(); ctx.arc(mx(s.x),my(s.y),6,0,7); ctx.fill();
+        ctx.fillStyle='#4fd08a'; ctx.font='10px Segoe UI'; ctx.fillText('door',mx(s.x),my(s.y)-9);
+      } else {
+        const x=mx(Math.min(s.x0,s.x1)), y=my(Math.max(s.y0,s.y1));
+        const w=Math.abs(s.x1-s.x0)*geom.s, h=Math.abs(s.y1-s.y0)*geom.s;
+        ctx.fillStyle='rgba(232,176,75,0.14)'; ctx.strokeStyle=isSel?'#ffffff':'#e8b04b'; ctx.lineWidth=isSel?3:2;
+        ctx.fillRect(x,y,w,h); ctx.strokeRect(x,y,w,h);
+        ctx.fillStyle='#e8b04b'; ctx.font='bold 13px Segoe UI';
+        ctx.fillText(s.label||'room', x+w/2, y+h/2);
+        ctx.fillStyle='#cfd3da'; ctx.font='11px Segoe UI';
+        ctx.fillText(Math.abs(s.x1-s.x0).toFixed(1)+'×'+Math.abs(s.y1-s.y0).toFixed(1)+'m', x+w/2, y+h/2+15);
+      }
     });
   }
   function renderList(){
-    rlist.innerHTML = rects.length ? rects.map((r,i)=>{
-      const w=Math.abs(r.x1-r.x0).toFixed(1), d=Math.abs(r.y1-r.y0).toFixed(1);
-      return '<div class="r"><b>'+(r.label||('#'+(i+1)))+'</b> — '+w+'×'+d+' m · '+pos((r.x0+r.x1)/2,(r.y0+r.y1)/2)+'</div>';
-    }).join('') : '<div style="color:#6b7079">No rooms drawn yet.</div>';
+    let h='';
+    shapes.forEach(s=>{
+      if(s.type==='room') h+='<div class="r"><b>'+(s.label||'room')+'</b> — room '+Math.abs(s.x1-s.x0).toFixed(1)+'×'+Math.abs(s.y1-s.y0).toFixed(1)+'m · '+pos((s.x0+s.x1)/2,(s.y0+s.y1)/2)+'</div>';
+      else if(s.type==='wall') h+='<div class="r"><b>wall</b> — '+s.x0.toFixed(1)+','+s.y0.toFixed(1)+' → '+s.x1.toFixed(1)+','+s.y1.toFixed(1)+'</div>';
+      else if(s.type==='door') h+='<div class="r"><b>door</b> — at '+s.x.toFixed(1)+','+s.y.toFixed(1)+'</div>';
+    });
+    cut.forEach(l=>h+='<div class="r" style="border-left-color:#e66"><b style="color:#f0a0a0">remove</b> — '+l+'</div>');
+    rlist.innerHTML = h||'<div style="color:#6b7079">Nothing drawn yet. Pick a tool and draw.</div>';
   }
   let down=false;
-  cv.addEventListener('pointerdown',e=>{ const b=cv.getBoundingClientRect(); down=true;
-    const x=cX(ix(e.clientX-b.left)), y=cY(iy(e.clientY-b.top)); cur={x0:x,y0:y,x1:x,y1:y}; });
+  cv.addEventListener('pointerdown',e=>{ const b=cv.getBoundingClientRect();
+    const x=cX(ix(e.clientX-b.left)), y=cY(iy(e.clientY-b.top));
+    if(tool==='room'||tool==='wall'){ down=true; cur={type:tool,x0:snap(x),y0:snap(y),x1:snap(x),y1:snap(y)}; }
+    else if(tool==='door'){ shapes.push({type:'door',x:snap(x),y:snap(y)}); draw(); renderList(); }
+    else if(tool==='cut'){ const i=pick(x,y); if(i>=0){shapes.splice(i,1);} else { const e2=pickExist(x,y); if(e2>=0){ const l=EXIST[e2].l; cut.has(l)?cut.delete(l):cut.add(l); } } sel=null; draw(); renderList(); }
+    else if(tool==='select'){ const i=pick(x,y); sel=(i>=0)?i:null; drag=(i>=0)?{x,y}:null; down=(i>=0); draw(); }
+  });
   cv.addEventListener('pointermove',e=>{ const b=cv.getBoundingClientRect();
     const x=cX(ix(e.clientX-b.left)), y=cY(iy(e.clientY-b.top)); dco.textContent='x '+x.toFixed(1)+'  y '+y.toFixed(1)+' m';
-    if(down&&cur){ cur.x1=x; cur.y1=y; draw(); } });
-  addEventListener('pointerup',()=>{ if(down&&cur){ down=false;
-    if(Math.abs(cur.x1-cur.x0)>0.6&&Math.abs(cur.y1-cur.y0)>0.6){
-      const nm=prompt('Name this area (optional):','');
-      const x0=Math.min(cur.x0,cur.x1),x1=Math.max(cur.x0,cur.x1),y0=Math.min(cur.y0,cur.y1),y1=Math.max(cur.y0,cur.y1);
-      rects.push({label:(nm&&nm.trim())?nm.trim():('#'+(rects.length+1)),x0,y0,x1,y1});
+    if(down&&cur){ cur.x1=snap(x); cur.y1=snap(y); draw(); }
+    else if(down&&tool==='select'&&drag&&sel!=null){ const dx=x-drag.x,dy=y-drag.y,s=shapes[sel]; if(s.type==='door'){s.x+=dx;s.y+=dy;}else{s.x0+=dx;s.x1+=dx;s.y0+=dy;s.y1+=dy;} drag.x=x;drag.y=y; draw(); }
+  });
+  addEventListener('pointerup',()=>{ if(down&&cur){
+    if(cur.type==='room'&&Math.abs(cur.x1-cur.x0)>0.6&&Math.abs(cur.y1-cur.y0)>0.6){
+      const nm=prompt('Name this room:',''); const x0=Math.min(cur.x0,cur.x1),x1=Math.max(cur.x0,cur.x1),y0=Math.min(cur.y0,cur.y1),y1=Math.max(cur.y0,cur.y1);
+      shapes.push({type:'room',label:(nm&&nm.trim())?nm.trim():'room'+(shapes.filter(s=>s.type==='room').length+1),x0,y0,x1,y1});
+    } else if(cur.type==='wall'&&Math.hypot(cur.x1-cur.x0,cur.y1-cur.y0)>0.6){
+      shapes.push({type:'wall',x0:cur.x0,y0:cur.y0,x1:cur.x1,y1:cur.y1});
     }
-    cur=null; draw(); renderList(); } });
-  document.getElementById('dUndo').onclick=()=>{rects.pop();draw();renderList();};
-  document.getElementById('dClear').onclick=()=>{if(confirm('Clear all rooms?')){rects=[];draw();renderList();}};
+    cur=null; draw(); renderList();
+  } down=false; drag=null; });
+  addEventListener('keydown',e=>{ if(wrap.classList.contains('on')&&(e.key==='Delete'||e.key==='Backspace')&&sel!=null){ shapes.splice(sel,1); sel=null; draw(); renderList(); } });
+  document.getElementById('dUndo').onclick=()=>{shapes.pop();sel=null;draw();renderList();};
+  document.getElementById('dClear').onclick=()=>{if(confirm('Clear everything you drew?')){shapes=[];cut.clear();sel=null;draw();renderList();}};
   document.getElementById('dCopy').onclick=()=>{
-    let t='LE COACH NEW ROOMS — metres. x: -20.025 left .. +20.025 right. y: -16.885 extension front .. -11.885 warehouse front .. +11.885 back. (Existing: leg room back-left, functional room right full-depth, main room front-open, reception+toilets in the front extension.)';
-    rects.forEach((r,i)=>{ t+='\n'+(i+1)+'. '+r.label+': x ['+r.x0.toFixed(1)+' .. '+r.x1.toFixed(1)+'], y ['+r.y0.toFixed(1)+' .. '+r.y1.toFixed(1)+']  ('+(r.x1-r.x0).toFixed(1)+' x '+(r.y1-r.y0).toFixed(1)+' m, '+pos((r.x0+r.x1)/2,(r.y0+r.y1)/2)+')'; });
-    t+='\nJSON: '+JSON.stringify(rects.map(r=>({label:r.label,x0:+r.x0.toFixed(2),x1:+r.x1.toFixed(2),y0:+r.y0.toFixed(2),y1:+r.y1.toFixed(2)})));
-    navigator.clipboard.writeText(t).then(()=>{dco.textContent='✓ Layout copied — paste it to Claude';},()=>{prompt('Copy this text and paste to Claude:',t);});
+    let t='LE COACH DESIGN EDITS — metres. x -20.025 left..+20.025 right. y -16.885 extension-front .. -11.885 warehouse-front .. +11.885 back.';
+    const rooms=shapes.filter(s=>s.type==='room'), walls=shapes.filter(s=>s.type==='wall'), doors=shapes.filter(s=>s.type==='door');
+    if(rooms.length){ t+='\nNEW ROOMS:'; rooms.forEach(s=>t+='\n - '+(s.label||'room')+': x['+s.x0.toFixed(1)+'..'+s.x1.toFixed(1)+'] y['+s.y0.toFixed(1)+'..'+s.y1.toFixed(1)+']'); }
+    if(walls.length){ t+='\nNEW WALLS:'; walls.forEach(s=>t+='\n - ('+s.x0.toFixed(1)+','+s.y0.toFixed(1)+') -> ('+s.x1.toFixed(1)+','+s.y1.toFixed(1)+')'); }
+    if(doors.length){ t+='\nDOORS:'; doors.forEach(s=>t+='\n - at ('+s.x.toFixed(1)+','+s.y.toFixed(1)+')'); }
+    if(cut.size){ t+='\nREMOVE EXISTING: '+[...cut].join(', '); }
+    t+='\nJSON: '+JSON.stringify({rooms,walls,doors,remove:[...cut]});
+    navigator.clipboard.writeText(t).then(()=>{dco.textContent='✓ Copied — paste it to Claude';},()=>{prompt('Copy this and paste to Claude:',t);});
   };
   document.getElementById('dPng').onclick=()=>{ draw(); const a=document.createElement('a'); a.download='lecoach_layout.png'; a.href=cv.toDataURL('image/png'); a.click(); dco.textContent='✓ Image saved — attach it to Claude'; };
   btn.onclick=()=>{ wrap.classList.add('on'); try{controls.unlock();}catch(e){} layout(); draw(); renderList(); };
