@@ -68,7 +68,7 @@ def gable(y):
     return [(X0,y,0),(X1,y,0)]+top
 poly('Wall_Back',gable(Y1),m_wall)
 # FRONT facade: lower wall w/ passages to the extension + gable triangles above
-wallX('Wall_FrontLow', X0, X1, Y0, m_wall, gaps=[(0,1.8),(6.5,3.0)], h=EAVE, t=TE)
+wallX('Wall_FrontLow', X0, X1, Y0, m_wall, gaps=[(-15,1.2),(0.75,1.6),(7.5,2.0)], h=EAVE, t=TE)
 for i,cx in enumerate(centers):
     lx,rx=bounds[i],bounds[i+1]
     poly(f'Wall_FrontGab_{i}', [(lx,Y0,EAVE),(rx,Y0,EAVE),(cx,Y0,APEX)], m_wall)
@@ -83,14 +83,18 @@ box('EntranceDoor',1.2,0.10,2.2,0.0,EYF-0.06,1.1,m_blue)          # on extension
 box('RollerShutter',4.8,0.08,3.0,15.0,Y0-0.05,1.5,m_steel)        # functional room front
 
 # ==================== INTERIOR (from user's design-mode walls) ====================
-# y=0 partition: leg-room opening at x[-18..-12]; door into the back room at x=1
+# y=0 partition: leg-room opening x[-18..-12]; back area re-SEALED (solid, no door)
 wallX('Wall_y0a', X0, -18, 0.0, m_wall)
-wallX('Wall_y0b', -12, 10, 0.0, m_wall, gaps=[(1.0,1.6)])
-# x=-10 partition (leg room east / back room west, solid)
+wallX('Wall_y0b', -12, 10, 0.0, m_wall)
 wallY('Wall_xm10', 0.0, Y1, -10, m_wall)
 # x=10 partition (functional room west): single opening at y[-6..-2]
 wallY('Wall_x10a', Y0, -6, 10, m_wall)
 wallY('Wall_x10b', -2, Y1, 10, m_wall)
+# OFFICE 1 & 2 at the front of the main room: x[2..6] y[-11.885..-8], doors into main
+wallY('Wall_Off_L', Y0, -8, 2, m_wall)
+wallY('Wall_Off_M', Y0, -8, 4, m_wall)
+wallY('Wall_Off_R', Y0, -8, 6, m_wall)
+wallX('Wall_Off_N', 2, 6, -8, m_wall, gaps=[(3,0.9),(5,0.9)])
 
 # ==================== FRONT EXTENSION (protruding OUTWARD) ====================
 box('Floor_Ext', EXR-EXL, Y0-EYF, 0.1, (EXL+EXR)/2, (EYF+Y0)/2, -0.05, m_floor)
@@ -99,13 +103,14 @@ wallX('Wall_ExtFront', EXL, EXR, EYF, m_wall, gaps=[(0,1.6)], h=EH, t=TE)       
 box('Wall_ExtLeft', TE, Y0-EYF, EH, EXL, (EYF+Y0)/2, EH/2, m_wall)
 box('Wall_ExtRight',TE, Y0-EYF, EH, EXR, (EYF+Y0)/2, EH/2, m_wall)
 # extension dividers: TOILETS/LOCKERS (left) | RECEPTION (mid) | right room
-wallY('Wall_ExtDivL', EYF, Y0, -3.5, m_wall, gaps=[(-14.4,1.2)])   # toilets <-> reception door
-wallY('Wall_ExtDivR', EYF, Y0, 4.0,  m_wall)                       # reception | right room (solid)
+wallY('Wall_ExtDivL', EYF, Y0, -3.5, m_wall)   # toilets | reception (solid; toilets enters main at x=-15)
+wallY('Wall_ExtDivR', EYF, Y0, 4.0,  m_wall)   # reception | right room (solid)
 
 # ---- labels ----
-label('LEG ROOM',-15,6,1.0); label('MAIN ROOM',0,-6,1.1)
-label('FUNCTIONAL ROOM',15,2,0.9); label('BACK ROOM',0,6,0.9)
-label('RECEPTION',0.25,-14.4,0.55); label('TOILETS & LOCKERS',-11.7,-14.4,0.55); label('ROOM',7,-14.4,0.5)
+label('LEG ROOM',-15,6,1.0); label('MAIN ROOM',-5,-4,1.1)
+label('FUNCTIONAL ROOM',15,2,0.9); label('(sealed)',0,6,0.7)
+label('RECEPTION',0.25,-14.4,0.5); label('TOILETS & LOCKERS',-11.7,-14.4,0.5); label('ROOM',7,-14.4,0.5)
+label('OFF1',3,-10,0.4); label('OFF2',5,-10,0.4)
 
 # ---- top-down plan render (frames extension too) ----
 hide=[o.name for o in col.objects if o.name.startswith(('Roof_','Ridge_','Tie_','Ceil_'))]
