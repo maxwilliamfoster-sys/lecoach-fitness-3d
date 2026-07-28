@@ -16,6 +16,7 @@ def M(n,rgba,r=0.9,me=0.0):
 m_floor=M('Floor',(0.12,0.12,0.13,1)); m_wall=M('WallExt',(0.13,0.13,0.14,1))
 m_roof=M('Roof',(0.10,0.11,0.12,1),0.6,0.4); m_steel=M('Steel',(0.30,0.32,0.36,1),0.5,0.7)
 m_blue=M('Blue',(0.03,0.11,0.55,1),0.5); m_txt=M('Label',(0.85,0.55,0.15,1),0.5)
+m_garage=M('Garage',(0.55,0.56,0.58,1),0.5,0.35)
 
 # ---- shell: 3 units x 13.35m = 40.05m wide x 23.77m deep ----
 UNIT=13.35; W=3*UNIT; D=23.77
@@ -68,7 +69,7 @@ def gable(y):
     return [(X0,y,0),(X1,y,0)]+top
 poly('Wall_Back',gable(Y1),m_wall)
 # FRONT facade: lower wall w/ passages to the extension + gable triangles above
-wallX('Wall_FrontLow', X0, X1, Y0, m_wall, gaps=[(-15,1.2),(0.75,1.6),(7.5,2.0)], h=EAVE, t=TE)
+wallX('Wall_FrontLow', X0, X1, Y0, m_wall, gaps=[(-15,1.2),(0.75,1.6),(7.5,2.0),(15,4.0)], h=EAVE, t=TE)
 for i,cx in enumerate(centers):
     lx,rx=bounds[i],bounds[i+1]
     poly(f'Wall_FrontGab_{i}', [(lx,Y0,EAVE),(rx,Y0,EAVE),(cx,Y0,APEX)], m_wall)
@@ -80,7 +81,18 @@ for i,cx in enumerate(centers):
     box(f'Ridge_{i}',0.16,D,0.18,cx,0,APEX-0.1,m_steel)
 for gy in (-8,0,8): box(f'Tie_{gy}',W,0.14,0.18,0,gy,EAVE-0.1,m_steel)
 box('EntranceDoor',1.2,0.10,2.2,0.0,EYF-0.06,1.1,m_blue)          # on extension outer wall
-box('RollerShutter',4.8,0.08,3.0,15.0,Y0-0.05,1.5,m_steel)        # functional room front
+# GARAGE / roller door in the functional-room front wall (faces car park) — 6 sectional panels
+for i in range(6): box(f'GarageDoor_{i}',3.9,0.10,0.46,15.0,Y0-0.02,0.25+i*0.48,m_garage)
+# CEILING FANS throughout the gym
+def fan(x,y,z=3.2):
+    box(f'FanRod_{x}_{y}',0.06,0.06,0.5,x,y,z+0.3,m_steel)
+    box(f'FanHub_{x}_{y}',0.34,0.34,0.2,x,y,z,m_steel)
+    box(f'FanBladeE_{x}_{y}',1.2,0.22,0.03,x+0.7,y,z-0.05,m_steel)
+    box(f'FanBladeW_{x}_{y}',1.2,0.22,0.03,x-0.7,y,z-0.05,m_steel)
+    box(f'FanBladeN_{x}_{y}',0.22,1.2,0.03,x,y+0.7,z-0.05,m_steel)
+    box(f'FanBladeS_{x}_{y}',0.22,1.2,0.03,x,y-0.7,z-0.05,m_steel)
+for fx,fy in [(-14,-4),(-6,-4),(-14,-9),(-6,-9),(0,-8),(8,-4),(15,-6),(15,0),(15,6),(-15,4),(-15,9)]:
+    fan(fx,fy)
 
 # ==================== INTERIOR (from user's design-mode walls) ====================
 # y=0 partition: leg-room opening x[-18..-12]; back area re-SEALED (solid, no door)

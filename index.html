@@ -128,7 +128,7 @@ function loadTex(file, rx, ry){
   t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8; return t;
 }
 const TEX_FLOOR = loadTex('floor_rubber.png', 20, 12);
-const TEX_WALL  = loadTex('wall_dark.png', 8, 2);
+const TEX_WALL  = loadTex('wall_dark.png', 12, 4);
 const TEX_ROOF  = loadTex('roof_steel.png', 10, 8);
 
 // ---- lighting ----
@@ -170,7 +170,7 @@ new GLTFLoader().load('lecoach_gym.glb', (gltf)=>{
     if(/^(Floor|FuncFloor)/i.test(nm)){
       o.material = new THREE.MeshStandardMaterial({ map:TEX_FLOOR, roughness:0.9, metalness:0.04, side:THREE.DoubleSide, envMapIntensity:0.3 });
     } else if(/^(Wall|Gable)/i.test(nm)){
-      o.material = new THREE.MeshStandardMaterial({ map:TEX_WALL, roughness:0.95, metalness:0.0, side:THREE.DoubleSide, envMapIntensity:0.25 });
+      o.material = new THREE.MeshStandardMaterial({ map:TEX_WALL, bumpMap:TEX_WALL, bumpScale:0.06, roughness:0.88, metalness:0.0, side:THREE.DoubleSide, envMapIntensity:0.32 });
     } else if(/^Roof/i.test(nm)){
       o.material = new THREE.MeshStandardMaterial({ map:TEX_ROOF, roughness:0.7, metalness:0.5, side:THREE.DoubleSide, envMapIntensity:0.55 });
     }
