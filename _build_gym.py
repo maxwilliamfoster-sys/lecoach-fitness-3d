@@ -103,13 +103,17 @@ wallX('Wall_ExtFront', EXL, EXR, EYF, m_wall, gaps=[(0,1.6)], h=EH, t=TE)       
 box('Wall_ExtLeft', TE, Y0-EYF, EH, EXL, (EYF+Y0)/2, EH/2, m_wall)
 box('Wall_ExtRight',TE, Y0-EYF, EH, EXR, (EYF+Y0)/2, EH/2, m_wall)
 # extension dividers: TOILETS/LOCKERS (left) | RECEPTION (mid) | right room
-wallY('Wall_ExtDivL', EYF, Y0, -3.5, m_wall)   # toilets | reception (solid; toilets enters main at x=-15)
-wallY('Wall_ExtDivR', EYF, Y0, 4.0,  m_wall)   # reception | right room (solid)
+wallY('Wall_ExtDivL', EYF, Y0, -3.5, m_wall)   # lockers/toilets zone | reception (ext-right room removed -> reception x[-3.5,10])
+# MALE + FEMALE toilets at the front of the toilets/lockers zone; rest = lockers
+wallY('Wall_MFdiv', EYF, -14, -8,    m_wall)                             # male|female divider
+wallY('Wall_FemL',  EYF, -14, -12.5, m_wall)                            # female left wall
+wallX('Wall_ToiBack', -12.5, -3.5, -14, m_wall, gaps=[(-10,0.9),(-6,0.9)])  # WC back wall + doors
 
 # ---- labels ----
 label('LEG ROOM',-15,6,1.0); label('MAIN ROOM',-5,-4,1.1)
 label('FUNCTIONAL ROOM',15,2,0.9); label('(sealed)',0,6,0.7)
-label('RECEPTION',0.25,-14.4,0.5); label('TOILETS & LOCKERS',-11.7,-14.4,0.5); label('ROOM',7,-14.4,0.5)
+label('RECEPTION',3,-13.8,0.6); label('LOCKERS',-16,-13.2,0.5)
+label('FEMALE',-10.25,-15.4,0.4); label('MALE',-5.75,-15.4,0.4)
 label('OFF1',3,-10,0.4); label('OFF2',5,-10,0.4)
 
 # ---- top-down plan render (frames extension too) ----
