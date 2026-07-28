@@ -9,18 +9,14 @@ OUT_DIR = r"C:\Users\maxwi\ComfyUI-Shared\output"
 PROJ_TEX = r"C:\Users\maxwi\Desktop\LeCoach3D\textures"
 os.makedirs(PROJ_TEX, exist_ok=True)
 
-# (output_name, seed, prompt)  — regenerating wall & roof as FLAT seamless swatches
+# (output_name, seed, prompt)  — crisper, cleaner black brick
 TEXTURES = [
-    ("wall_dark", 212,
-     "flat seamless tileable texture swatch of dark charcoal near-black painted brick wall, "
-     "industrial gym interior wall, straight-on orthographic elevation filling the entire "
-     "frame edge to edge, no floor, no ceiling, no corner, no perspective, no vignette, "
-     "uniform even flat lighting, high detail PBR material scan, 4k, no people, no text"),
-    ("roof_steel", 213,
-     "flat seamless tileable texture swatch of dark grey trapezoidal corrugated steel "
-     "cladding sheet, industrial metal roof panel, straight-on orthographic view filling the "
-     "whole frame, evenly spaced parallel ribs, subtle weathering, no perspective, no "
-     "vignette, uniform even flat lighting, 4k material scan, no people, no text"),
+    ("wall_dark", 321,
+     "flat seamless tileable texture swatch of matte black painted brick wall, clean tidy "
+     "uniform brickwork, crisp sharp mortar lines, evenly spaced neat bricks, professional gym "
+     "interior, perfectly flat straight-on orthographic elevation filling the entire frame edge "
+     "to edge, completely even flat studio lighting, no floor, no ceiling, no corner, no "
+     "perspective, no vignette, no gradient, ultra sharp high detail PBR albedo, 4k, no people, no text"),
 ]
 
 def post(path, payload):

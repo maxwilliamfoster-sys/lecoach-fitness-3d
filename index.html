@@ -157,7 +157,8 @@ function resolveCollisions(p){
 // ---- load building ----
 const startBtn = document.getElementById('start');
 const coordsEl = document.getElementById('coords');
-new GLTFLoader().load('lecoach_gym.glb', (gltf)=>{
+function loadModel(attempt){
+ new GLTFLoader().load('lecoach_gym.glb'+(attempt?('?r='+Date.now()):''), (gltf)=>{
   const model = gltf.scene;
   const box = new THREE.Box3();
   model.traverse(o=>{
@@ -194,10 +195,13 @@ new GLTFLoader().load('lecoach_gym.glb', (gltf)=>{
 }, (xhr)=>{
   if(xhr.total) startBtn.textContent = `Loading ${Math.round(xhr.loaded/xhr.total*100)}%`;
 }, (err)=>{
-  startBtn.textContent = 'Model failed to load';
+  if(attempt<2){ coordsEl.textContent='retrying…'; setTimeout(()=>loadModel(attempt+1),800); return; }
+  startBtn.textContent = 'Model failed to load — hard-refresh (Ctrl+F5)';
   coordsEl.textContent = 'error loading lecoach_gym.glb';
   console.error(err);
 });
+}
+loadModel(0);
 
 // ---- post-processing ----
 const composer = new EffectComposer(renderer);
