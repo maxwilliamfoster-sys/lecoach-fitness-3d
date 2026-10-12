@@ -6,7 +6,7 @@ import json, time, urllib.request, urllib.error, shutil, os
 HOST = "http://127.0.0.1:8188"
 CKPT = "flux1-schnell-fp8.safetensors"
 OUT_DIR = r"C:\Users\maxwi\ComfyUI-Shared\output"
-PROJ_TEX = r"C:\Users\maxwi\Desktop\LeCoach3D\textures"
+PROJ_TEX = r"C:\Users\maxwi\Projects\_Archive\LeCoach3D\textures"
 os.makedirs(PROJ_TEX, exist_ok=True)
 
 # (output_name, seed, prompt)  — crisper, cleaner black brick

@@ -137,7 +137,7 @@ cam=bpy.data.objects.new('Top',cam_d); scene.collection.objects.link(cam)
 cam.location=Vector((0,(EYF+Y1)/2,50)); cam.rotation_euler=(0,0,0); scene.camera=cam
 scene.render.engine='BLENDER_WORKBENCH'; scene.display.shading.light='FLAT'; scene.display.shading.color_type='MATERIAL'
 scene.render.resolution_x=1600; scene.render.resolution_y=int(1600*((Y1-EYF)+3)/(W+3))
-scene.render.filepath=r"C:\Users\maxwi\Desktop\LeCoach3D\frames\PLAN.png"
+scene.render.filepath=r"C:\Users\maxwi\Projects\_Archive\LeCoach3D\frames\PLAN.png"
 bpy.ops.render.render(write_still=True)
 
 # ---- export (enlarge everything 1.5x about origin) ----
@@ -150,7 +150,7 @@ for o in bpy.data.objects:
     if o.type=='MESH': o.matrix_world = S @ o.matrix_world
 bpy.context.view_layer.update()
 for o in bpy.data.objects: o.select_set(o.type=='MESH')
-bpy.ops.export_scene.gltf(filepath=r"C:\Users\maxwi\Desktop\LeCoach3D\lecoach_gym.glb",
+bpy.ops.export_scene.gltf(filepath=r"C:\Users\maxwi\Projects\_Archive\LeCoach3D\lecoach_gym.glb",
                           export_format='GLB',use_selection=True,export_apply=True,export_yup=True)
-bpy.ops.wm.save_as_mainfile(filepath=r"C:\Users\maxwi\Desktop\LeCoach3D\lecoach_gym.blend")
+bpy.ops.wm.save_as_mainfile(filepath=r"C:\Users\maxwi\Projects\_Archive\LeCoach3D\lecoach_gym.blend")
 print("EXT_DONE objects:",len(col.objects))
